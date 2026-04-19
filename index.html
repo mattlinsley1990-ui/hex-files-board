@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Veritas — Investigation Board</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Oswald:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cork:#c8955c; --cork-dark:#a0703a; --cork-light:#d9a96e;
+  --frame:#3a2510; --frame-inner:#5c3a1e;
+  --card-cream:#f5efdf; --card-aged:#ede0c4;
+  --ubergeist:#9b59b6; --bioform:#e67e22; --feywild:#27ae60; --fiendish:#c0392b;
+  --str-ubergeist:#c39bd3; --str-bioform:#f0a86a; --str-feywild:#82e0aa;
+  --str-fiendish:#ec7063; --str-cross:#d4ac6e;
+  --ui-bg:rgba(18,9,3,.93); --ui-border:var(--cork-dark); --ui-text:var(--cork-light);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;width:100vw;height:100vh;user-select:none;touch-action:none;}
+
+#frame{position:fixed;inset:0;border:26px solid var(--frame);box-shadow:inset 0 0 0 6px var(--frame-inner),inset 0 0 60px rgba(0,0,0,.5),0 0 80px rgba(0,0,0,.8);pointer-events:none;z-index:1000;}
+#frame::before{content:'VERITAS — INVESTIGATION BOARD';position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:'Oswald',sans-serif;font-size:11px;font-weight:600;letter-spacing:4px;color:var(--cork-light);white-space:nowrap;}
+@media(max-width:768px){#frame{border-width:12px;}#frame::before{font-size:8px;letter-spacing:2px;top:-13px;}}
+
+#viewport{position:absolute;inset:26px;overflow:hidden;background-color:var(--cork);background-image:radial-gradient(ellipse at 25% 30%,#d4a06a 0%,transparent 55%),radial-gradient(ellipse at 75% 70%,#b8803a 0%,transparent 55%),radial-gradient(ellipse at 50% 50%,#c8955c 0%,#a87040 100%);cursor:grab;touch-action:none;}
+#viewport.panning{cursor:grabbing;}
+/* String-draw mode cursor */
+#viewport.string-mode{cursor:crosshair;}
+#viewport.string-mode .card{cursor:pointer;}
+#viewport::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:1;background-image:repeating-linear-gradient(87deg,transparent 0,transparent 20px,rgba(90,55,15,.04) 20px,rgba(90,55,15,.04) 21px),repeating-linear-gradient(93deg,transparent 0,transparent 35px,rgba(70,40,10,.03) 35px,rgba(70,40,10,.03) 36px);}
+@media(max-width:768px){#viewport{inset:12px;}}
+
+#board{position:absolute;width:8000px;height:7000px;transform-origin:0 0;will-change:transform;}
+
+#strings{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.sp{fill:none;stroke-linecap:round;filter:drop-shadow(1px 2px 3px rgba(0,0,0,.4));}
+.sl{font-family:'Courier Prime',monospace;fill:rgba(30,12,4,.88);font-style:italic;pointer-events:none;}
+.slb{fill:rgba(215,192,155,.88);}
+
+/* ── CARDS ── */
+.card{position:absolute;border-radius:3px;box-shadow:4px 6px 18px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.55);touch-action:none;cursor:grab;}
+.card.animating{transition:left .52s cubic-bezier(.22,1,.36,1),top .52s cubic-bezier(.22,1,.36,1),opacity .4s ease;}
+.card.fade-only{transition:opacity .4s ease;}
+.card::before{content:'';position:absolute;left:50%;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle at 35% 35%,#ff7070,#8b0000);box-shadow:0 2px 8px rgba(0,0,0,.55),inset 0 1px 2px rgba(255,210,210,.35);z-index:10;pointer-events:none;}
+.card.hidden{opacity:0;pointer-events:none;}
+.card.dragging-card{transition:none!important;z-index:800!important;box-shadow:8px 12px 30px rgba(0,0,0,.6);}
+
+/* String-mode highlight */
+.card.string-from{outline:3px solid #f0d060;outline-offset:3px;box-shadow:0 0 0 6px rgba(240,208,96,.25),4px 6px 18px rgba(0,0,0,.38);}
+.card.string-hover{outline:2px solid rgba(240,208,96,.6);outline-offset:2px;}
+
+/* ── INVESTIGATION CARDS — 20% larger, 50% broader stripe ── */
+.card.inv{background:var(--card-aged);border-top:12px solid var(--inv-color);}
+.card.inv::before{background:radial-gradient(circle at 35% 35%,#ffe066,#b8960a);}
+.card.inv .ct{font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--inv-color);}
+.card.inv .cn{font-family:'Special Elite',cursive;color:#2c1810;line-height:1.2;}
+.card.inv .cb{color:#6b4222;line-height:1.65;border-top:1px solid rgba(0,0,0,.12);font-style:italic;}
+
+/* ── ENTITY / CUSTOM CARDS ── */
+.card.entity,.card.custom{background:var(--card-cream);}
+.card.entity .ct,.card.custom .ct{font-family:'Oswald',sans-serif;letter-spacing:2.5px;text-transform:uppercase;color:#a07848;}
+.card.entity .cn,.card.custom .cn{font-family:'Special Elite',cursive;color:#2c1810;line-height:1.25;}
+.card.entity .cb,.card.custom .cb{color:#5c3a18;line-height:1.65;}
+.card.entity .dots,.card.custom .dots{display:flex;gap:5px;flex-wrap:wrap;}
+.dot{border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+.card.custom .card-actions{display:flex;gap:6px;border-top:1px solid rgba(0,0,0,.1);}
+.card.custom .card-actions button{font-family:'Oswald',sans-serif;letter-spacing:1.5px;text-transform:uppercase;background:transparent;border:1px solid rgba(0,0,0,.2);color:#8a6030;border-radius:2px;cursor:pointer;}
+.card.custom .card-actions button.del{border-color:rgba(192,57,43,.3);color:#c0392b;}
+
+.card.missing{border:2px dashed #b08858!important;border-top:2px dashed #b08858!important;background:rgba(245,239,223,.72)!important;}
+.card.missing .ct::after{content:' ⚠ NO PAGE';color:#c0392b;}
+
+/* ══ DESKTOP SIZES ══ */
+@media(min-width:769px){
+  /* Investigation cards: previous 370px × 1.2 = 444px */
+  .card.inv{width:444px;padding:24px 26px 26px;}
+  .card.inv::before{width:26px;height:26px;top:-17px;}
+  .card.inv .ct{font-size:14px;margin-bottom:11px;}
+  .card.inv .cn{font-size:36px;margin-bottom:14px;}
+  .card.inv .cb{font-size:20px;padding-top:13px;}
+
+  .card.entity,.card.custom{width:310px;padding:18px 20px 20px;}
+  .card.entity::before,.card.custom::before{width:20px;height:20px;top:-13px;}
+  .card.entity .ct,.card.custom .ct{font-size:11px;margin-bottom:7px;}
+  .card.entity .cn,.card.custom .cn{font-size:26px;margin-bottom:9px;}
+  .card.entity .cb,.card.custom .cb{font-size:18px;}
+  .card.entity .dots,.card.custom .dots{margin-top:12px;}
+  .dot{width:13px;height:13px;}
+  .card.custom .card-actions{margin-top:12px;padding-top:10px;}
+  .card.custom .card-actions button{font-size:11px;padding:7px 13px;}
+}
+
+/* ══ MOBILE SIZES ══ */
+@media(max-width:768px){
+  .card.inv{width:250px;padding:15px 17px 17px;}
+  .card.inv::before{width:17px;height:17px;top:-12px;}
+  .card.inv .ct{font-size:9px;margin-bottom:7px;}
+  .card.inv .cn{font-size:22px;margin-bottom:9px;}
+  .card.inv .cb{font-size:13px;padding-top:9px;}
+  .card.entity,.card.custom{width:190px;padding:12px 14px 13px;}
+  .card.entity::before,.card.custom::before{width:14px;height:14px;top:-10px;}
+  .card.entity .ct,.card.custom .ct{font-size:8px;margin-bottom:5px;}
+  .card.entity .cn,.card.custom .cn{font-size:17px;margin-bottom:6px;}
+  .card.entity .cb,.card.custom .cb{font-size:12px;}
+  .card.entity .dots,.card.custom .dots{margin-top:8px;}
+  .dot{width:9px;height:9px;}
+  .card.custom .card-actions{margin-top:8px;padding-top:7px;}
+  .card.custom .card-actions button{font-size:9px;padding:5px 9px;}
+}
+
+/* ── FILTER BAR ── */
+#filter-bar{position:fixed;z-index:900;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;background:var(--ui-bg);border:1px solid var(--ui-border);border-radius:3px;backdrop-filter:blur(6px);}
+@media(min-width:769px){#filter-bar{top:38px;left:50%;transform:translateX(-50%);padding:11px 18px;gap:8px;}}
+@media(max-width:768px){#filter-bar{top:18px;left:50%;transform:translateX(-50%);padding:6px 10px;gap:4px;max-width:calc(100vw - 24px);}}
+.fbtn{font-family:'Oswald',sans-serif;text-transform:uppercase;border:1px solid transparent;border-radius:2px;cursor:pointer;background:transparent;color:#8a6840;transition:all .2s;white-space:nowrap;}
+@media(min-width:769px){.fbtn{font-size:14px;letter-spacing:2px;padding:10px 18px;min-height:42px;}}
+@media(max-width:768px){.fbtn{font-size:9px;letter-spacing:1px;padding:6px 8px;min-height:30px;}}
+.fbtn:hover{color:var(--cork-light);}
+.fbtn.active{color:#f5efdf;border-color:currentColor;}
+.fbtn[data-f=all].active{color:#d4b080;}
+.fbtn[data-f=ubergeist].active{color:var(--ubergeist);}
+.fbtn[data-f=bioform].active{color:var(--bioform);}
+.fbtn[data-f=feywild].active{color:var(--feywild);}
+.fbtn[data-f=fiendish].active{color:var(--fiendish);}
+
+/* ── CONTROLS ── */
+#controls{position:fixed;z-index:900;display:flex;flex-direction:column;}
+@media(min-width:769px){#controls{bottom:38px;left:38px;gap:7px;}}
+@media(max-width:768px){#controls{bottom:18px;left:18px;gap:4px;}}
+#controls button{background:var(--ui-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:'Oswald',sans-serif;letter-spacing:2px;text-transform:uppercase;cursor:pointer;border-radius:2px;transition:background .2s;text-align:left;}
+@media(min-width:769px){#controls button{font-size:13px;padding:11px 20px;min-height:44px;}}
+@media(max-width:768px){#controls button{font-size:10px;padding:8px 12px;min-height:34px;}}
+#controls button:hover,#controls button:active{background:rgba(55,32,12,.95);}
+#btn-newcard{border-color:#d4ac6e!important;color:#d4ac6e!important;}
+#btn-drawstring{border-color:#82c4e0!important;color:#82c4e0!important;}
+#btn-drawstring.active-mode{background:rgba(130,196,224,.15)!important;border-color:#82c4e0!important;color:#f0f8ff!important;}
+#btn-clearsave{opacity:.55;}
+@media(min-width:769px){#btn-clearsave{font-size:10px!important;}}
+@media(max-width:768px){#btn-clearsave{font-size:8px!important;}}
+
+/* ── LEGEND ── */
+#legend{position:fixed;z-index:900;background:var(--ui-bg);border:1px solid var(--ui-border);border-radius:3px;backdrop-filter:blur(6px);}
+@media(min-width:769px){#legend{bottom:38px;right:38px;padding:18px 22px;}}
+@media(max-width:768px){#legend{display:none;padding:12px 16px;}#legend.mobile-open{display:block;bottom:auto;top:75px;right:10px;}}
+#legend h4{font-family:'Oswald',sans-serif;letter-spacing:3px;color:var(--cork-light);text-transform:uppercase;}
+@media(min-width:769px){#legend h4{font-size:11px;margin-bottom:13px;}}
+@media(max-width:768px){#legend h4{font-size:9px;margin-bottom:9px;}}
+.lr{display:flex;align-items:center;}
+@media(min-width:769px){.lr{gap:11px;margin-bottom:9px;}}
+@media(max-width:768px){.lr{gap:8px;margin-bottom:6px;}}
+.ll{height:3px;border-radius:2px;flex-shrink:0;}
+.ld{height:2px;flex-shrink:0;background:repeating-linear-gradient(90deg,var(--str-cross) 0,var(--str-cross) 5px,transparent 5px,transparent 9px);}
+@media(min-width:769px){.ll,.ld{width:36px;}}
+@media(max-width:768px){.ll,.ld{width:24px;}}
+.lx{font-family:'Courier Prime',monospace;color:#c8a070;}
+@media(min-width:769px){.lx{font-size:14px;}}
+@media(max-width:768px){.lx{font-size:11px;}}
+.lhr{border:none;border-top:1px solid rgba(255,255,255,.08);}
+@media(min-width:769px){.lhr{margin:10px 0;}}
+@media(max-width:768px){.lhr{margin:7px 0;}}
+.lt{display:flex;align-items:center;}
+@media(min-width:769px){.lt{gap:10px;margin-bottom:7px;}.li{font-size:14px;width:20px;}}
+@media(max-width:768px){.lt{gap:7px;margin-bottom:5px;}.li{font-size:11px;width:16px;}}
+#btn-legend-toggle{display:none;}
+@media(max-width:768px){#btn-legend-toggle{display:block;}}
+
+/* ── STRING-DRAW BANNER ── */
+#string-banner{
+  position:fixed;top:0;left:0;right:0;z-index:1100;
+  background:rgba(130,196,224,.18);
+  border-bottom:1px solid rgba(130,196,224,.4);
+  backdrop-filter:blur(6px);
+  font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:2px;
+  color:#c8eaf8;text-align:center;padding:10px;
+  display:none;pointer-events:none;
+}
+#string-banner.show{display:block;}
+
+/* ── MODAL ── */
+#modal-overlay{position:fixed;inset:0;background:rgba(10,5,2,.8);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;}
+#modal-overlay.open{display:flex;}
+#modal{background:#2a1a0a;border:1px solid var(--cork-dark);border-radius:4px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.7);}
+@media(min-width:769px){#modal{padding:32px 36px;}}
+@media(max-width:768px){#modal{padding:20px 18px;}}
+#modal h2{font-family:'Special Elite',cursive;color:var(--cork-light);}
+@media(min-width:769px){#modal h2{font-size:26px;margin-bottom:6px;}}
+@media(max-width:768px){#modal h2{font-size:20px;margin-bottom:5px;}}
+.modal-sub{font-family:'Courier Prime',monospace;color:#8a6840;font-style:italic;}
+@media(min-width:769px){.modal-sub{font-size:14px;margin-bottom:24px;}}
+@media(max-width:768px){.modal-sub{font-size:12px;margin-bottom:18px;}}
+.mfield{margin-bottom:18px;}
+.mfield label{display:block;font-family:'Oswald',sans-serif;letter-spacing:2px;text-transform:uppercase;color:#a07848;}
+@media(min-width:769px){.mfield label{font-size:11px;margin-bottom:8px;}}
+@media(max-width:768px){.mfield label{font-size:9px;margin-bottom:6px;}}
+.mfield input,.mfield textarea,.mfield select{width:100%;background:#1a0d05;border:1px solid var(--cork-dark);color:#f0dfc0;font-family:'Courier Prime',monospace;padding:10px 13px;border-radius:2px;outline:none;transition:border-color .2s;-webkit-appearance:none;}
+@media(min-width:769px){.mfield input,.mfield textarea,.mfield select{font-size:15px;}}
+@media(max-width:768px){.mfield input,.mfield textarea,.mfield select{font-size:13px;}}
+.mfield input:focus,.mfield textarea:focus,.mfield select:focus{border-color:var(--cork-light);}
+.mfield textarea{height:80px;resize:vertical;}
+#conn-list{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+.conn-row{display:grid;gap:6px;align-items:start;}
+@media(min-width:769px){.conn-row{grid-template-columns:1fr 1fr auto;}}
+@media(max-width:480px){.conn-row{grid-template-columns:1fr;}}
+.conn-row button{background:transparent;border:1px solid rgba(192,57,43,.4);color:#c0392b;font-family:'Oswald',sans-serif;font-size:10px;padding:10px;border-radius:2px;cursor:pointer;min-height:40px;}
+#btn-add-conn{width:100%;background:transparent;border:1px dashed var(--cork-dark);color:#8a6840;font-family:'Oswald',sans-serif;letter-spacing:2px;text-transform:uppercase;cursor:pointer;border-radius:2px;margin-top:6px;transition:all .2s;min-height:42px;}
+@media(min-width:769px){#btn-add-conn{font-size:12px;padding:11px;}}
+@media(max-width:768px){#btn-add-conn{font-size:10px;padding:9px;}}
+#btn-add-conn:hover{border-color:var(--cork-light);color:var(--cork-light);}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}
+@media(min-width:769px){.modal-actions{margin-top:26px;}}
+@media(max-width:768px){.modal-actions{margin-top:18px;}}
+.modal-actions button{font-family:'Oswald',sans-serif;letter-spacing:2px;text-transform:uppercase;border-radius:2px;cursor:pointer;transition:all .2s;min-height:44px;}
+@media(min-width:769px){.modal-actions button{font-size:13px;padding:12px 24px;}}
+@media(max-width:768px){.modal-actions button{font-size:11px;padding:10px 18px;}}
+#btn-cancel{background:transparent;border:1px solid var(--cork-dark);color:#8a6840;}
+#btn-cancel:hover{border-color:var(--cork-light);color:var(--cork-light);}
+#btn-save{background:var(--cork-dark);border:1px solid var(--cork-dark);color:#f0dfc0;}
+#btn-save:hover{background:var(--cork);}
+
+/* String name modal */
+#strmodal-overlay{position:fixed;inset:0;background:rgba(10,5,2,.7);z-index:2100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;}
+#strmodal-overlay.open{display:flex;}
+#strmodal{background:#2a1a0a;border:1px solid #82c4e0;border-radius:4px;padding:28px 32px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.7);}
+#strmodal h3{font-family:'Special Elite',cursive;font-size:20px;color:#c8eaf8;margin-bottom:6px;}
+#strmodal p{font-family:'Courier Prime',monospace;font-size:13px;color:#82a0b0;margin-bottom:18px;font-style:italic;}
+#str-label-input{width:100%;background:#1a0d05;border:1px solid #82c4e0;color:#f0dfc0;font-family:'Courier Prime',monospace;font-size:15px;padding:10px 13px;border-radius:2px;outline:none;}
+#str-label-input:focus{border-color:#c8eaf8;}
+#strmodal .str-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end;}
+#strmodal .str-actions button{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:2px;text-transform:uppercase;border-radius:2px;cursor:pointer;padding:10px 20px;min-height:40px;}
+#str-cancel{background:transparent;border:1px solid var(--cork-dark);color:#8a6840;}
+#str-save{background:rgba(130,196,224,.2);border:1px solid #82c4e0;color:#c8eaf8;}
+
+/* Manage strings list */
+#str-list-section{margin-top:18px;}
+#str-list-section h4{font-family:'Oswald',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#a07848;margin-bottom:8px;}
+#str-list{display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;}
+.str-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:2px;padding:8px 10px;}
+.str-item-label{font-family:'Courier Prime',monospace;font-size:12px;color:#d4b896;}
+.str-item-del{background:transparent;border:1px solid rgba(192,57,43,.4);color:#c0392b;font-family:'Oswald',sans-serif;font-size:9px;padding:4px 8px;border-radius:2px;cursor:pointer;white-space:nowrap;}
+
+#toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--ui-bg);border:1px solid var(--ui-border);color:var(--cork-light);font-family:'Courier Prime',monospace;font-size:14px;padding:11px 22px;border-radius:3px;z-index:3000;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+#toast.show{opacity:1;}
+#pinch-hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--ui-bg);border:1px solid var(--ui-border);color:var(--cork-light);font-family:'Courier Prime',monospace;font-size:14px;padding:16px 24px;border-radius:3px;z-index:2500;opacity:0;transition:opacity .4s;pointer-events:none;text-align:center;line-height:1.7;}
+#pinch-hint.show{opacity:1;}
+</style>
+</head>
+<body>
+<div id="frame"></div>
+<div id="string-banner">STRING MODE — Click a card to start, then click another to connect them. Press Escape to cancel.</div>
+
+<div id="filter-bar">
+  <button class="fbtn active" data-f="all">All Investigations</button>
+  <button class="fbtn" data-f="ubergeist">👼 Ubergeist</button>
+  <button class="fbtn" data-f="bioform">🐀 BioForm</button>
+  <button class="fbtn" data-f="feywild">🎭 Feywild</button>
+  <button class="fbtn" data-f="fiendish">😈 Fiendish</button>
+</div>
+
+<div id="viewport">
+<div id="board">
+<svg id="strings"></svg>
+
+<!-- INVESTIGATIONS -->
+<div class="card inv" id="inv-ubergeist" data-invs="ubergeist" style="--inv-color:var(--ubergeist);z-index:50;">
+  <div class="ct">Investigation</div><div class="cn">Project Ubergeist</div>
+  <div class="cb">Soul-manipulation experiments. Sammael is Specimen IX. Tavier M trapped in the facility.</div>
+</div>
+<div class="card inv" id="inv-bioform" data-invs="bioform" style="--inv-color:var(--bioform);z-index:50;">
+  <div class="ct">Investigation</div><div class="cn">Project BioForm</div>
+  <div class="cb">Forced transformation using extraplanar material. Artrick a confirmed subject. The Crucible is the end goal.</div>
+</div>
+<div class="card inv" id="inv-feywild" data-invs="feywild" style="--inv-color:var(--feywild);z-index:50;">
+  <div class="ct">Investigation</div><div class="cn">The Feywild</div>
+  <div class="cb">Centuries of Fey infiltration. Inter-planar rift sought. The Mother of Knots operates through bargains.</div>
+</div>
+<div class="card inv" id="inv-fiendish" data-invs="fiendish" style="--inv-color:var(--fiendish);z-index:50;">
+  <div class="ct">Investigation</div><div class="cn">Fiendish Influences</div>
+  <div class="cb">Infernal presences in Bellefleur. A possible proxy war manipulating the union and ACME Tink.</div>
+</div>
+
+<!-- FACTIONS -->
+<div class="card entity" id="ent-veildiv" data-invs="ubergeist bioform feywild" style="z-index:40;">
+  <div class="ct">Faction</div><div class="cn">The Veil Division</div>
+  <div class="cb">Architects of Ubergeist. Suspected BioForm overseers. Monitoring Feywild. Agents catatonic at Astor Estate.</div>
+  <div class="dots"><div class="dot" style="background:var(--ubergeist)"></div><div class="dot" style="background:var(--bioform)"></div><div class="dot" style="background:var(--feywild)"></div></div>
+</div>
+<div class="card entity" id="ent-acmetink" data-invs="bioform fiendish" style="z-index:40;">
+  <div class="ct">Faction</div><div class="cn">ACME Tink</div>
+  <div class="cb">BioForm corporate infrastructure and logistics. BF-coded containers at docklands. Tiefling tied to Fiendish.</div>
+  <div class="dots"><div class="dot" style="background:var(--bioform)"></div><div class="dot" style="background:var(--fiendish)"></div></div>
+</div>
+<div class="card entity" id="ent-qinglong" data-invs="fiendish" style="z-index:40;">
+  <div class="ct">Faction</div><div class="cn">Qing Long</div>
+  <div class="cb">Carid's former martial arts dojo. Sifu Gweilo vanished under unexplained circumstances.</div>
+  <div class="dots"><div class="dot" style="background:var(--fiendish)"></div></div>
+</div>
+
+<!-- CHARACTERS -->
+<div class="card entity" id="ent-sammael" data-invs="ubergeist" style="z-index:40;">
+  <div class="ct">Character — Veritas</div><div class="cn">Sammael</div>
+  <div class="cb">Confirmed subject, Specimen IX. Celestial origin suspected — golden wings in dream. Bargain with Tavier M.</div>
+  <div class="dots"><div class="dot" style="background:var(--ubergeist)"></div></div>
+</div>
+<div class="card entity" id="ent-artrick" data-invs="bioform" style="z-index:40;">
+  <div class="ct">Character — Veritas</div><div class="cn">Artrick</div>
+  <div class="cb">Confirmed unwilling BioForm subject. Transformed from human to Shifter via deliberate exposure at ACME Tink.</div>
+  <div class="dots"><div class="dot" style="background:var(--bioform)"></div></div>
+</div>
+<div class="card entity" id="ent-artemesia" data-invs="feywild fiendish" style="z-index:40;">
+  <div class="ct">Character — Veritas</div><div class="cn">Artemesia</div>
+  <div class="cb">Detected Ellara's fey energy at the gala. Detected Carid's fiendish aura and its unnatural movement.</div>
+  <div class="dots"><div class="dot" style="background:var(--feywild)"></div><div class="dot" style="background:var(--fiendish)"></div></div>
+</div>
+
+<!-- NPCS -->
+<div class="card entity" id="ent-squidproquo" data-invs="ubergeist bioform feywild" style="z-index:40;">
+  <div class="ct">NPC</div><div class="cn">Squid Pro Quo</div>
+  <div class="cb">Veil Division operative. Holds partial Ubergeist intel. Missing partner investigated BioForm — trail leads to the Feywild.</div>
+  <div class="dots"><div class="dot" style="background:var(--ubergeist)"></div><div class="dot" style="background:var(--bioform)"></div><div class="dot" style="background:var(--feywild)"></div></div>
+</div>
+<div class="card entity missing" id="ent-tavierm" data-invs="ubergeist" style="z-index:40;">
+  <div class="ct">NPC</div><div class="cn">Tavier M</div>
+  <div class="cb">Shadow entity from the Shadowfell. Ubergeist co-subject, still trapped. Bargain made with Sammael.</div>
+  <div class="dots"><div class="dot" style="background:var(--ubergeist)"></div></div>
+</div>
+<div class="card entity" id="ent-carid" data-invs="fiendish" style="z-index:40;">
+  <div class="ct">NPC</div><div class="cn">Carid</div>
+  <div class="cb">Confirmed fiendish aura — spiritual energy precedes his body. Former Qing Long. Union enforcer.</div>
+  <div class="dots"><div class="dot" style="background:var(--fiendish)"></div></div>
+</div>
+<div class="card entity" id="ent-tonybiggs" data-invs="fiendish" style="z-index:40;">
+  <div class="ct">NPC</div><div class="cn">Tony Biggs</div>
+  <div class="cb">Union leader. Operations may be subject to fiendish manipulation. Associate at museum gala.</div>
+  <div class="dots"><div class="dot" style="background:var(--fiendish)"></div></div>
+</div>
+<div class="card entity" id="ent-giuseppe" data-invs="feywild" style="z-index:40;">
+  <div class="ct">NPC</div><div class="cn">Giuseppe the Carpenter</div>
+  <div class="cb">Architect of Timberknoll body-snatching. Bargained with Mother of Knots for decades. Escaped to Feywild.</div>
+  <div class="dots"><div class="dot" style="background:var(--feywild)"></div></div>
+</div>
+<div class="card entity" id="ent-montaigne" data-invs="feywild" style="z-index:40;">
+  <div class="ct">NPC</div><div class="cn">Frederick Montaigne</div>
+  <div class="cb">Professor researching inter-planar rifts. Books retrieved from Astor Estate. Rift theory now in progress — Feywild crossing imminent.</div>
+  <div class="dots"><div class="dot" style="background:var(--feywild)"></div></div>
+</div>
+<div class="card entity" id="ent-ellara" data-invs="feywild" style="z-index:40;">
+  <div class="ct">NPC</div><div class="cn">Ellara Raleigh</div>
+  <div class="cb">Confirmed Fey entity on the material plane. Grad student under Montaigne. Wishes to return home.</div>
+  <div class="dots"><div class="dot" style="background:var(--feywild)"></div></div>
+</div>
+<div class="card entity missing" id="ent-motherofknots" data-invs="feywild" style="z-index:40;">
+  <div class="ct">NPC</div><div class="cn">The Mother of Knots</div>
+  <div class="cb">Ancient Lumian deity. Exchanges children's souls for Fey passage to the material plane.</div>
+  <div class="dots"><div class="dot" style="background:var(--feywild)"></div></div>
+</div>
+
+<!-- LOCATIONS -->
+<div class="card entity" id="ent-timberknoll" data-invs="feywild" style="z-index:40;">
+  <div class="ct">Location</div><div class="cn">Timberknoll</div>
+  <div class="cb">Site of confirmed body-snatching. Feywild portal in Hollow. Giuseppe's workshop found here.</div>
+  <div class="dots"><div class="dot" style="background:var(--feywild)"></div></div>
+</div>
+<div class="card entity" id="ent-isleofgalois" data-invs="bioform" style="z-index:40;">
+  <div class="ct">Location</div><div class="cn">Isle of Galois</div>
+  <div class="cb">Destination of BioForm shipments via ACME Tink. Ship found docked. Squid Cult based here.</div>
+  <div class="dots"><div class="dot" style="background:var(--bioform)"></div></div>
+</div>
+<div class="card entity" id="ent-astorestate" data-invs="feywild fiendish" style="z-index:40;">
+  <div class="ct">Location</div><div class="cn">The Astor Estate</div>
+  <div class="cb">Site of Astor's arcanotech planar bridge attempt and bound infernal cohort. Astral Shard and occult library recovered. Now destroyed by fire.</div>
+  <div class="dots"><div class="dot" style="background:var(--feywild)"></div><div class="dot" style="background:var(--fiendish)"></div></div>
+</div>
+
+<!-- FREED DEVILS -->
+<div class="card entity" id="ent-thebutler" data-invs="fiendish" style="z-index:40;">
+  <div class="ct">NPC</div><div class="cn">The Butler</div>
+  <div class="cb">Head of the infernal cohort bound to the Astor Estate under Astor's contracts. Freed when the binding broke. Holds Veritas's card. Open to negotiation.</div>
+  <div class="dots"><div class="dot" style="background:var(--fiendish)"></div></div>
+</div>
+
+</div></div>
+
+<!-- LEGEND -->
+<div id="legend">
+  <h4>Strings</h4>
+  <div class="lr"><div class="ll" style="background:var(--str-ubergeist)"></div><span class="lx">Project Ubergeist</span></div>
+  <div class="lr"><div class="ll" style="background:var(--str-bioform)"></div><span class="lx">Project BioForm</span></div>
+  <div class="lr"><div class="ll" style="background:var(--str-feywild)"></div><span class="lx">The Feywild</span></div>
+  <div class="lr"><div class="ll" style="background:var(--str-fiendish)"></div><span class="lx">Fiendish Influences</span></div>
+  <div class="lr"><div class="ld"></div><span class="lx">Cross-investigation</span></div>
+  <div class="lr"><div class="ll" style="background:#aaa;opacity:.6;"></div><span class="lx">Custom connection</span></div>
+  <hr class="lhr">
+  <h4>Cards</h4>
+  <div class="lt"><span class="li">📌</span><span class="lx">Investigation hub</span></div>
+  <div class="lt"><span class="li">⚔️</span><span class="lx">Veritas character</span></div>
+  <div class="lt"><span class="li">🏛️</span><span class="lx">Faction</span></div>
+  <div class="lt"><span class="li">👤</span><span class="lx">NPC</span></div>
+  <div class="lt"><span class="li">📍</span><span class="lx">Location</span></div>
+  <div class="lt"><span class="li">📝</span><span class="lx">Custom note</span></div>
+  <div class="lt"><span class="li">⚠️</span><span class="lx">No Notion page yet</span></div>
+</div>
+
+<!-- CONTROLS -->
+<div id="controls">
+  <button id="btn-newcard">＋ NEW CARD</button>
+  <button id="btn-drawstring">〰 DRAW STRING</button>
+  <button id="btn-managestrings">✕ MANAGE STRINGS</button>
+  <button id="btn-reset">⌖ RESET VIEW</button>
+  <button id="btn-zi">＋ ZOOM IN</button>
+  <button id="btn-zo">－ ZOOM OUT</button>
+  <button id="btn-legend-toggle">? LEGEND</button>
+  <button id="btn-clearsave">CLEAR SAVED DATA</button>
+</div>
+
+<!-- NEW CARD MODAL -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h2>Pin a New Card</h2>
+    <div class="modal-sub">Add a note, suspect, location, or clue to the board.</div>
+    <div class="mfield">
+      <label>Card Type</label>
+      <select id="m-type"><option>Note</option><option>NPC</option><option>Location</option><option>Faction</option><option>Character</option><option>Clue</option><option>Theory</option><option>Question</option></select>
+    </div>
+    <div class="mfield">
+      <label>Name / Title</label>
+      <input type="text" id="m-name" placeholder="e.g. Fran Jameson" autocomplete="off">
+    </div>
+    <div class="mfield">
+      <label>Notes</label>
+      <textarea id="m-body" placeholder="What do we know? What are we suspicious of?"></textarea>
+    </div>
+    <div class="mfield">
+      <label>Investigations</label>
+      <select id="m-invs" multiple style="height:90px;">
+        <option value="ubergeist">👼 Project Ubergeist</option>
+        <option value="bioform">🐀 Project BioForm</option>
+        <option value="feywild">🎭 The Feywild</option>
+        <option value="fiendish">😈 Fiendish Influences</option>
+      </select>
+      <div style="font-family:'Courier Prime',monospace;font-size:12px;color:#6a4820;margin-top:5px;font-style:italic;">Hold Ctrl/Cmd to select multiple</div>
+    </div>
+    <div class="mfield">
+      <label>String Connections</label>
+      <div id="conn-list"></div>
+      <button id="btn-add-conn" type="button">+ Add Connection</button>
+    </div>
+    <div class="modal-actions">
+      <button id="btn-cancel" type="button">Cancel</button>
+      <button id="btn-save" type="button">Pin to Board</button>
+    </div>
+  </div>
+</div>
+
+<!-- STRING NAME MODAL -->
+<div id="strmodal-overlay">
+  <div id="strmodal">
+    <h3>Name this Connection</h3>
+    <p id="str-connecting-label">Connecting: — → —</p>
+    <input type="text" id="str-label-input" placeholder="e.g. Veil Division operative" autocomplete="off">
+    <div class="str-actions">
+      <button id="str-cancel" type="button">Cancel</button>
+      <button id="str-save" type="button">Add String</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE STRINGS MODAL -->
+<div id="manage-overlay" style="position:fixed;inset:0;background:rgba(10,5,2,.8);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;">
+  <div style="background:#2a1a0a;border:1px solid var(--cork-dark);border-radius:4px;padding:28px 32px;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.7);">
+    <h2 style="font-family:'Special Elite',cursive;font-size:22px;color:var(--cork-light);margin-bottom:6px;">Manage Custom Strings</h2>
+    <p style="font-family:'Courier Prime',monospace;font-size:13px;color:#8a6840;font-style:italic;margin-bottom:20px;">All manually drawn connections — click ✕ to remove.</p>
+    <div id="manage-str-list"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:20px;">
+      <button id="manage-close" type="button" style="background:transparent;border:1px solid var(--cork-dark);color:#8a6840;font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:2px;text-transform:uppercase;padding:10px 22px;border-radius:2px;cursor:pointer;">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="pinch-hint">Pinch to zoom<br><span style="font-size:12px;opacity:.7;">Two fingers to zoom in and out</span></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const STORAGE_KEY = 'hexfiles-board-v5';
+const isMobile = () => window.innerWidth <= 768;
+const DSIZES = { CW:444, CH:270, GX:120, GY:130, COLS:9 };
+const MSIZES = { CW:250, CH:185, GX:55,  GY:70,  COLS:5 };
+const SZ = () => isMobile() ? MSIZES : DSIZES;
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let currentFilter = 'all';
+let scale, panX=0, panY=0;
+let positions = { all:{}, ubergeist:{}, bioform:{}, feywild:{}, fiendish:{} };
+let customCards  = [];
+let customConns  = []; // manually drawn strings: [{id, from, to, label}]
+let stringMode   = false;
+let stringFrom   = null; // card id of first click in string mode
+
+const boardEl   = document.getElementById('board');
+const vpEl      = document.getElementById('viewport');
+const stringSVG = document.getElementById('strings');
+
+// ═══════════════════════════════════════════════════════════
+// BUILT-IN CONNECTIONS — added SPQ → Veil Division
+// ═══════════════════════════════════════════════════════════
+const BUILTIN_CONNS = [
+  ['inv-ubergeist','ent-sammael',     'var(--str-ubergeist)',3.5,'Specimen IX'],
+  ['inv-ubergeist','ent-tavierm',     'var(--str-ubergeist)',3,  'Co-subject / bargain'],
+  ['inv-ubergeist','ent-veildiv',     'var(--str-ubergeist)',3.5,'Architects & operators'],
+  ['inv-ubergeist','ent-squidproquo', 'var(--str-ubergeist)',2.5,'Holds partial intel'],
+  ['ent-sammael',  'ent-tavierm',     'var(--str-ubergeist)',2.5,'Shadow bargain'],
+  ['ent-squidproquo','ent-veildiv',   'var(--str-ubergeist)',2.5,'Veil Division operative'],
+  ['inv-bioform','ent-artrick',       'var(--str-bioform)',3.5,'Confirmed subject'],
+  ['inv-bioform','ent-veildiv',       'var(--str-bioform)',3,  'Suspected oversight'],
+  ['inv-bioform','ent-acmetink',      'var(--str-bioform)',3.5,'Corporate infrastructure'],
+  ['inv-bioform','ent-squidproquo',   'var(--str-bioform)',2.5,'Partner investigated'],
+  ['inv-bioform','ent-isleofgalois',  'var(--str-bioform)',2.5,'Shipment destination'],
+  ['ent-acmetink','ent-isleofgalois', 'var(--str-bioform)',2.5,'Shipping route'],
+  ['inv-feywild','ent-giuseppe',      'var(--str-feywild)',3.5,'Architect of operation'],
+  ['inv-feywild','ent-motherofknots', 'var(--str-feywild)',3.5,'Ancient bargain-maker'],
+  ['inv-feywild','ent-timberknoll',   'var(--str-feywild)',3,  'Site of operation'],
+  ['inv-feywild','ent-montaigne',     'var(--str-feywild)',3,  'Rift research'],
+  ['inv-feywild','ent-ellara',        'var(--str-feywild)',3,  'Confirmed Fey entity'],
+  ['inv-feywild','ent-veildiv',       'var(--str-feywild)',2.5,'Monitoring — suspected',true],
+  ['ent-giuseppe','ent-motherofknots','var(--str-feywild)',2.5,'Decades of bargains'],
+  ['ent-giuseppe','ent-timberknoll',  'var(--str-feywild)',2,  'Workshop here'],
+  ['ent-montaigne','ent-ellara',      'var(--str-feywild)',2,  'Working to return her'],
+  ['ent-artemesia','ent-ellara',      'var(--str-feywild)',2,  'Detected fey energy'],
+  ['inv-fiendish','ent-carid',        'var(--str-fiendish)',3.5,'Confirmed fiendish aura'],
+  ['inv-fiendish','ent-tonybiggs',    'var(--str-fiendish)',3,  'Possible manipulation'],
+  ['inv-fiendish','ent-qinglong',     'var(--str-fiendish)',3,  "Carid's former dojo"],
+  ['inv-fiendish','ent-acmetink',     'var(--str-fiendish)',2.5,'Tiefling operative'],
+  ['ent-carid',   'ent-qinglong',     'var(--str-fiendish)',2,  'Former member'],
+  ['ent-artemesia','ent-carid',       'var(--str-fiendish)',2,  'Detected fiendish aura'],
+  ['inv-ubergeist','inv-bioform',     'var(--str-cross)',2.5,'Veil Division link',true],
+  ['inv-feywild',  'inv-fiendish',    'var(--str-cross)',2.5,'Astor Estate',true],
+  ['ent-veildiv',  'ent-acmetink',    'var(--str-cross)',2,  'Oversight chain',true],
+  ['ent-squidproquo','ent-acmetink',  'var(--str-cross)',2,  'Shared trail',true],
+  ['inv-feywild',  'ent-squidproquo', 'var(--str-cross)',2,  'Missing partner trail',true],
+  ['inv-feywild',  'ent-astorestate', 'var(--str-feywild)',3,'Planar bridge attempt'],
+  ['inv-fiendish', 'ent-astorestate', 'var(--str-fiendish)',3,'Bound infernal cohort'],
+  ['inv-fiendish', 'ent-thebutler',   'var(--str-fiendish)',2.5,'Head of bound cohort'],
+  ['ent-astorestate','ent-thebutler', 'var(--str-fiendish)',2,'Served under contract'],
+  ['ent-astorestate','ent-montaigne', 'var(--str-feywild)',2,'Books retrieved here'],
+];
+
+// ═══════════════════════════════════════════════════════════
+// GRID LAYOUTS
+// ═══════════════════════════════════════════════════════════
+const GRID_LAYOUTS = {
+  all:{
+    'inv-ubergeist':[1,1],'inv-bioform':[6,1],'inv-feywild':[1,6.5],'inv-fiendish':[6,6.5],
+    'ent-veildiv':[3.5,0],'ent-sammael':[0,0],'ent-tavierm':[0,2.5],'ent-squidproquo':[3.5,2],
+    'ent-artrick':[8.5,0],'ent-acmetink':[9,2.5],'ent-isleofgalois':[9,1],
+    'ent-giuseppe':[0,5.5],'ent-motherofknots':[0,7.5],'ent-timberknoll':[2,9],
+    'ent-montaigne':[3.5,9.5],'ent-ellara':[5,9.5],'ent-artemesia':[4,8],
+    'ent-carid':[8.5,5.5],'ent-tonybiggs':[9,7.5],'ent-qinglong':[9,5.5],
+    'ent-astorestate':[3.5,5],'ent-thebutler':[8.5,8],
+  },
+  ubergeist:{
+    'inv-ubergeist':[2,2],'ent-sammael':[0,1],'ent-tavierm':[0,3],
+    'ent-veildiv':[4,1],'ent-squidproquo':[4,3],
+  },
+  bioform:{
+    'inv-bioform':[2,2],'ent-artrick':[0,1],'ent-veildiv':[0,3],
+    'ent-acmetink':[4,1],'ent-squidproquo':[4,3],'ent-isleofgalois':[2,4.5],
+  },
+  feywild:{
+    'inv-feywild':[3,2],'ent-giuseppe':[0,0.5],'ent-motherofknots':[0,2.5],
+    'ent-timberknoll':[1,4.5],'ent-montaigne':[5.5,0.5],'ent-ellara':[5.5,2.5],
+    'ent-artemesia':[5,4.5],'ent-veildiv':[3,4.5],
+    'ent-astorestate':[1.5,2],'ent-squidproquo':[7,1.5],
+  },
+  fiendish:{
+    'inv-fiendish':[2,2],'ent-carid':[0,1],'ent-tonybiggs':[0,3],
+    'ent-qinglong':[4,1],'ent-acmetink':[4,3],'ent-artemesia':[2,4.5],
+    'ent-astorestate':[2,0],'ent-thebutler':[4,5],
+  },
+};
+
+// Helper: get display name for a card id
+function cardName(id) {
+  const el = document.getElementById(id);
+  if (!el) return id;
+  const cn = el.querySelector('.cn');
+  return cn ? cn.textContent.trim() : id;
+}
+
+// ═══════════════════════════════════════════════════════════
+// STORAGE
+// ═══════════════════════════════════════════════════════════
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      positions, customCards, customConns, filter: currentFilter,
+    }));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    if (d.positions) Object.keys(positions).forEach(f => { positions[f] = d.positions[f] || {}; });
+    customCards  = d.customCards  || [];
+    customConns  = d.customConns  || [];
+    currentFilter = d.filter || 'all';
+    return true;
+  } catch(e) { return false; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// TRANSFORM
+// ═══════════════════════════════════════════════════════════
+function applyT() {
+  boardEl.style.transform = `translate(${panX}px,${panY}px) scale(${scale})`;
+}
+
+function calcDefaultScale() {
+  const dpr = window.devicePixelRatio || 1;
+  const sz  = SZ();
+  const vw  = vpEl.clientWidth;
+  const fit = (vw / (sz.COLS * (sz.CW + sz.GX))) * (dpr > 1.5 ? dpr * 0.7 : 1);
+  return Math.min(isMobile() ? 1.1 : 1.4, Math.max(0.12, fit));
+}
+
+// ═══════════════════════════════════════════════════════════
+// LAYOUT ENGINE
+// ═══════════════════════════════════════════════════════════
+function gridPx(col, row, ox, oy) {
+  const sz = SZ();
+  return { x: ox + col*(sz.CW+sz.GX), y: oy + row*(sz.CH+sz.GY) };
+}
+
+function gridBounds(layout) {
+  const sz = SZ();
+  let mc=0, mr=0;
+  Object.values(layout).forEach(([c,r]) => { mc=Math.max(mc,c); mr=Math.max(mr,r); });
+  return { w:(mc+1)*(sz.CW+sz.GX)-sz.GX, h:(mr+1)*(sz.CH+sz.GY)-sz.GY };
+}
+
+function applyLayout(filter, animate) {
+  const layout = GRID_LAYOUTS[filter];
+  if (!layout) return;
+  const fp = positions[filter];
+  const sz = SZ();
+  const vw = vpEl.clientWidth/scale, vh = vpEl.clientHeight/scale;
+  const {w,h} = gridBounds(layout);
+  const ox = Math.max(40,(vw-w)/2), oy = Math.max(60,(vh-h)/2);
+
+  const visibleIds = new Set(Object.keys(layout));
+  customCards.forEach(cc => { if (filter==='all'||cc.invs.includes(filter)) visibleIds.add(cc.id); });
+
+  document.querySelectorAll('.card').forEach(card => {
+    const id = card.id;
+    if (!visibleIds.has(id)) {
+      card.classList.remove('animating'); card.classList.add('hidden'); return;
+    }
+    card.classList.remove('hidden');
+
+    let tx, ty;
+    if (fp[id]) { tx=fp[id].x; ty=fp[id].y; }
+    else if (layout[id]) {
+      const [col,row]=layout[id]; const p=gridPx(col,row,ox,oy);
+      tx=p.x; ty=p.y; fp[id]={x:tx,y:ty};
+    } else {
+      const idx=customCards.findIndex(c=>c.id===id);
+      tx=ox+w+80; ty=oy+idx*(sz.CH+70); fp[id]={x:tx,y:ty};
+    }
+
+    if (animate) { card.classList.add('animating'); setTimeout(()=>card.classList.remove('animating'),620); }
+    else { card.classList.remove('animating'); }
+
+    card.style.left=tx+'px'; card.style.top=ty+'px';
+    const rot=((id.charCodeAt(4)||0)%9-4)*0.6;
+    card.style.transform=`rotate(${rot}deg)`;
+  });
+
+  setTimeout(drawStrings, animate?560:60);
+}
+
+// ═══════════════════════════════════════════════════════════
+// STRINGS
+// ═══════════════════════════════════════════════════════════
+function cardCentre(id) {
+  const el = document.getElementById(id);
+  if (!el||el.classList.contains('hidden')) return null;
+  return { x:parseFloat(el.style.left)+el.offsetWidth/2, y:parseFloat(el.style.top)+el.offsetHeight/2 };
+}
+
+function drawStrings() {
+  stringSVG.innerHTML='';
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  stringSVG.appendChild(defs);
+  const mobile=isMobile(), showLabels=!mobile||scale>0.5;
+  const fontSize=mobile?14:22;
+
+  const allConns=[
+    ...BUILTIN_CONNS.map(c=>({from:c[0],to:c[1],color:c[2],sw:c[3],label:c[4],dashed:c[5]||false})),
+    ...customConns.map(c=>({from:c.from,to:c.to,color:'rgba(195,185,165,.95)',sw:2.5,label:c.label,dashed:false})),
+    ...customCards.flatMap(cc=>(cc.connections||[]).map(conn=>({from:cc.id,to:conn.to,color:'rgba(175,155,125,.95)',sw:2.5,label:conn.label,dashed:false}))),
+  ];
+
+  allConns.forEach(({from,to,color,sw,label,dashed},i)=>{
+    let f=cardCentre(from), t=cardCentre(to);
+    if(!f||!t)return;
+    if(f.x>t.x){[f,t]=[t,f];}
+    const dx=t.x-f.x,dy=t.y-f.y,dist=Math.sqrt(dx*dx+dy*dy);
+    const mx=(f.x+t.x)/2,my=(f.y+t.y)/2+dist*0.11;
+    const d=`M${f.x} ${f.y} Q${mx} ${my} ${t.x} ${t.y}`;
+    const pid=`p${i}`;
+    const dp=document.createElementNS('http://www.w3.org/2000/svg','path');
+    dp.setAttribute('id',pid);dp.setAttribute('d',d);defs.appendChild(dp);
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',d);path.setAttribute('stroke',color);
+    path.setAttribute('stroke-width',mobile?sw*1.3:sw);
+    path.classList.add('sp');if(dashed)path.setAttribute('stroke-dasharray','10,7');
+    stringSVG.appendChild(path);
+    if(label&&dist>100&&showLabels){
+      const cw=mobile?8:11.5,lw=label.length*cw+20,lh=mobile?17:26;
+      const bg=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      bg.setAttribute('x',mx-lw/2);bg.setAttribute('y',my-lh/2-2);
+      bg.setAttribute('width',lw);bg.setAttribute('height',lh);bg.setAttribute('rx',4);
+      bg.classList.add('slb');stringSVG.appendChild(bg);
+      const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.classList.add('sl');txt.style.fontSize=fontSize+'px';
+      const tp=document.createElementNS('http://www.w3.org/2000/svg','textPath');
+      tp.setAttribute('href',`#${pid}`);tp.setAttribute('startOffset','50%');tp.setAttribute('text-anchor','middle');
+      tp.textContent=label;txt.appendChild(tp);stringSVG.appendChild(txt);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// STRING-DRAW MODE
+// ═══════════════════════════════════════════════════════════
+function enterStringMode() {
+  stringMode=true; stringFrom=null;
+  vpEl.classList.add('string-mode');
+  document.getElementById('string-banner').classList.add('show');
+  document.getElementById('btn-drawstring').classList.add('active-mode');
+  document.getElementById('btn-drawstring').textContent='✕ CANCEL STRING';
+}
+
+function exitStringMode() {
+  stringMode=false; stringFrom=null;
+  vpEl.classList.remove('string-mode');
+  document.getElementById('string-banner').classList.remove('show');
+  document.getElementById('btn-drawstring').classList.remove('active-mode');
+  document.getElementById('btn-drawstring').textContent='〰 DRAW STRING';
+  document.querySelectorAll('.card.string-from,.card.string-hover').forEach(c=>{
+    c.classList.remove('string-from','string-hover');
+  });
+}
+
+function handleStringClick(card) {
+  if (!stringMode) return false;
+  if (!stringFrom) {
+    // First click — set "from"
+    stringFrom=card.id;
+    card.classList.add('string-from');
+    document.getElementById('string-banner').textContent=
+      `STRING MODE — "${cardName(card.id)}" selected. Now click the card to connect it to.`;
+    return true;
+  } else {
+    // Second click — open name modal
+    if (card.id===stringFrom) {
+      showToast('Select a different card to connect to');
+      return true;
+    }
+    const fromId=stringFrom, toId=card.id;
+    // Update modal labels
+    document.getElementById('str-connecting-label').textContent=
+      `Connecting: ${cardName(fromId)} → ${cardName(toId)}`;
+    document.getElementById('str-label-input').value='';
+    document.getElementById('strmodal-overlay').classList.add('open');
+    setTimeout(()=>document.getElementById('str-label-input').focus(),100);
+
+    // Save pending connection for when modal confirms
+    document.getElementById('str-save')._pending={fromId,toId};
+    exitStringMode();
+    return true;
+  }
+}
+
+document.getElementById('btn-drawstring').addEventListener('click',()=>{
+  if(stringMode) exitStringMode();
+  else enterStringMode();
+});
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&stringMode) exitStringMode(); });
+
+// String name modal confirm
+document.getElementById('str-save').addEventListener('click',()=>{
+  const pending=document.getElementById('str-save')._pending;
+  if(!pending)return;
+  const label=document.getElementById('str-label-input').value.trim();
+  const conn={id:'str-'+Date.now(),from:pending.fromId,to:pending.toId,label:label||''};
+  customConns.push(conn);
+  document.getElementById('strmodal-overlay').classList.remove('open');
+  drawStrings(); saveState();
+  showToast(`String added: ${cardName(pending.fromId)} → ${cardName(pending.toId)}`);
+});
+
+document.getElementById('str-cancel').addEventListener('click',()=>{
+  document.getElementById('strmodal-overlay').classList.remove('open');
+});
+
+// Manage strings
+document.getElementById('btn-managestrings').addEventListener('click',()=>{
+  renderManageList();
+  document.getElementById('manage-overlay').style.display='flex';
+});
+document.getElementById('manage-close').addEventListener('click',()=>{
+  document.getElementById('manage-overlay').style.display='none';
+});
+
+function renderManageList(){
+  const list=document.getElementById('manage-str-list');
+  list.innerHTML='';
+  if(customConns.length===0){
+    list.innerHTML='<p style="font-family:\'Courier Prime\',monospace;font-size:13px;color:#6a4820;font-style:italic;">No custom strings yet. Use "Draw String" to add some.</p>';
+    return;
+  }
+  customConns.forEach(conn=>{
+    const row=document.createElement('div');
+    row.className='str-item';
+    row.innerHTML=`<span class="str-item-label">${cardName(conn.from)} → ${cardName(conn.to)}${conn.label?' — "'+conn.label+'"':''}</span><button class="str-item-del" type="button">✕ Remove</button>`;
+    row.querySelector('.str-item-del').addEventListener('click',()=>{
+      customConns=customConns.filter(c=>c.id!==conn.id);
+      drawStrings(); saveState(); renderManageList();
+      showToast('String removed');
+    });
+    list.appendChild(row);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// MOUSE PAN
+// ═══════════════════════════════════════════════════════════
+let mousePanning=false,mpsx,mpsy,mppx,mppy;
+vpEl.addEventListener('mousedown',e=>{
+  if(e.target.closest('.card')||stringMode)return;
+  mousePanning=true;mpsx=e.clientX;mpsy=e.clientY;mppx=panX;mppy=panY;
+  vpEl.classList.add('panning');
+});
+document.addEventListener('mousemove',e=>{
+  if(!mousePanning||draggingCard)return;
+  panX=mppx+(e.clientX-mpsx);panY=mppy+(e.clientY-mpsy);applyT();
+});
+document.addEventListener('mouseup',()=>{mousePanning=false;vpEl.classList.remove('panning');});
+vpEl.addEventListener('wheel',e=>{
+  e.preventDefault();
+  scale=Math.min(2.5,Math.max(0.12,scale+(e.deltaY>0?-0.05:0.05)));
+  applyT();drawStrings();
+},{passive:false});
+
+// String-mode hover highlight
+vpEl.addEventListener('mousemove',e=>{
+  if(!stringMode||!stringFrom)return;
+  const card=e.target.closest('.card');
+  document.querySelectorAll('.card.string-hover').forEach(c=>c.classList.remove('string-hover'));
+  if(card&&card.id!==stringFrom&&!card.classList.contains('hidden'))
+    card.classList.add('string-hover');
+});
+
+// ═══════════════════════════════════════════════════════════
+// TOUCH PAN & PINCH
+// ═══════════════════════════════════════════════════════════
+let touchState=null;
+function getDist(t1,t2){const dx=t1.clientX-t2.clientX,dy=t1.clientY-t2.clientY;return Math.sqrt(dx*dx+dy*dy);}
+vpEl.addEventListener('touchstart',e=>{
+  if(e.target.closest('.card'))return;
+  e.preventDefault();
+  if(e.touches.length===1){touchState={type:'pan',sx:e.touches[0].clientX,sy:e.touches[0].clientY,spx:panX,spy:panY};}
+  else if(e.touches.length===2){touchState={type:'pinch',startDist:getDist(e.touches[0],e.touches[1]),startScale:scale};showPinchHint();}
+},{passive:false});
+vpEl.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(!touchState||draggingCard)return;
+  if(touchState.type==='pan'&&e.touches.length===1){panX=touchState.spx+(e.touches[0].clientX-touchState.sx);panY=touchState.spy+(e.touches[0].clientY-touchState.sy);applyT();}
+  else if(touchState.type==='pinch'&&e.touches.length===2){scale=Math.min(2.5,Math.max(0.12,touchState.startScale*(getDist(e.touches[0],e.touches[1])/touchState.startDist)));applyT();}
+},{passive:false});
+vpEl.addEventListener('touchend',e=>{
+  if(e.touches.length===0){touchState=null;drawStrings();}
+  else if(e.touches.length===1&&touchState?.type==='pinch'){touchState={type:'pan',sx:e.touches[0].clientX,sy:e.touches[0].clientY,spx:panX,spy:panY};}
+});
+
+// ═══════════════════════════════════════════════════════════
+// CARD DRAGGING — all cards, per-filter position saving
+// ═══════════════════════════════════════════════════════════
+let draggingCard=null,dsx,dsy,dox,doy;
+
+function makeDraggable(card){
+  const onStart=(cx,cy)=>{
+    if(stringMode){handleStringClick(card);return;}
+    draggingCard=card;dsx=cx;dsy=cy;
+    dox=parseFloat(card.style.left)||0;doy=parseFloat(card.style.top)||0;
+    card.classList.add('dragging-card');card.style.zIndex=600;
+  };
+  card.addEventListener('mousedown',e=>{if(e.target.closest('button'))return;e.stopPropagation();onStart(e.clientX,e.clientY);});
+  card.addEventListener('touchstart',e=>{if(e.target.closest('button'))return;e.stopPropagation();onStart(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
+}
+
+const onDragMove=(cx,cy)=>{
+  if(!draggingCard)return;
+  draggingCard.style.left=(dox+(cx-dsx)/scale)+'px';
+  draggingCard.style.top =(doy+(cy-dsy)/scale)+'px';
+  drawStrings();
+};
+document.addEventListener('mousemove',e=>onDragMove(e.clientX,e.clientY));
+document.addEventListener('touchmove',e=>{if(draggingCard){e.preventDefault();onDragMove(e.touches[0].clientX,e.touches[0].clientY);}},{passive:false});
+
+const onDragEnd=()=>{
+  if(!draggingCard)return;
+  positions[currentFilter][draggingCard.id]={x:parseFloat(draggingCard.style.left),y:parseFloat(draggingCard.style.top)};
+  draggingCard.classList.remove('dragging-card');draggingCard.style.zIndex='';
+  saveState();draggingCard=null;
+};
+document.addEventListener('mouseup',onDragEnd);
+document.addEventListener('touchend',()=>{if(draggingCard)onDragEnd();});
+
+function attachDragging(){document.querySelectorAll('.card').forEach(makeDraggable);}
+
+// ═══════════════════════════════════════════════════════════
+// CUSTOM CARDS
+// ═══════════════════════════════════════════════════════════
+function getAllCardOptions(){
+  return [
+    {id:'inv-ubergeist',name:'Project Ubergeist'},{id:'inv-bioform',name:'Project BioForm'},
+    {id:'inv-feywild',name:'The Feywild'},{id:'inv-fiendish',name:'Fiendish Influences'},
+    {id:'ent-veildiv',name:'The Veil Division'},{id:'ent-acmetink',name:'ACME Tink'},
+    {id:'ent-qinglong',name:'Qing Long'},{id:'ent-sammael',name:'Sammael'},
+    {id:'ent-artrick',name:'Artrick'},{id:'ent-artemesia',name:'Artemesia'},
+    {id:'ent-squidproquo',name:'Squid Pro Quo'},{id:'ent-tavierm',name:'Tavier M'},
+    {id:'ent-carid',name:'Carid'},{id:'ent-tonybiggs',name:'Tony Biggs'},
+    {id:'ent-giuseppe',name:'Giuseppe the Carpenter'},{id:'ent-montaigne',name:'Frederick Montaigne'},
+    {id:'ent-ellara',name:'Ellara Raleigh'},{id:'ent-motherofknots',name:'The Mother of Knots'},
+    {id:'ent-timberknoll',name:'Timberknoll'},{id:'ent-isleofgalois',name:'Isle of Galois'},
+    {id:'ent-astorestate',name:'The Astor Estate'},{id:'ent-thebutler',name:'The Butler'},
+    ...customCards.map(c=>({id:c.id,name:c.name})),
+  ];
+}
+
+function buildConnRow(targetId='',label=''){
+  const row=document.createElement('div');row.className='conn-row';
+  const opts=getAllCardOptions().map(o=>`<option value="${o.id}"${o.id===targetId?' selected':''}>${o.name}</option>`).join('');
+  row.innerHTML=`<select class="conn-target"><option value="">— connect to —</option>${opts}</select><input type="text" class="conn-label" placeholder="Label" value="${label}"><button class="conn-remove" type="button">✕</button>`;
+  row.querySelector('.conn-remove').addEventListener('click',()=>row.remove());
+  return row;
+}
+
+function renderCustomCard(cc){
+  const existing=document.getElementById(cc.id);if(existing)existing.remove();
+  const card=document.createElement('div');
+  card.className='card custom';card.id=cc.id;card.dataset.invs=cc.invs.join(' ');card.style.zIndex=40;
+  const dots=cc.invs.map(inv=>`<div class="dot" style="background:var(--${inv})"></div>`).join('');
+  card.innerHTML=`<div class="ct">${cc.type}</div><div class="cn">${cc.name}</div><div class="cb">${cc.body}</div>${cc.invs.length?`<div class="dots">${dots}</div>`:''}<div class="card-actions"><button class="edit-card" type="button">✎ Edit</button><button class="del del-card" type="button">✕ Remove</button></div>`;
+  card.querySelector('.edit-card').addEventListener('click',e=>{e.stopPropagation();openModalForEdit(cc);});
+  card.querySelector('.del-card').addEventListener('click',e=>{
+    e.stopPropagation();if(!confirm(`Remove "${cc.name}"?`))return;
+    customCards=customCards.filter(c=>c.id!==cc.id);
+    Object.keys(positions).forEach(f=>delete positions[f][cc.id]);
+    card.remove();drawStrings();saveState();showToast(`"${cc.name}" removed`);
+  });
+  boardEl.appendChild(card);makeDraggable(card);return card;
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODAL — new card
+// ═══════════════════════════════════════════════════════════
+let editingCardId=null;
+function openModal(){
+  editingCardId=null;
+  document.getElementById('m-type').value='Note';document.getElementById('m-name').value='';document.getElementById('m-body').value='';
+  Array.from(document.getElementById('m-invs').options).forEach(o=>o.selected=false);
+  document.getElementById('conn-list').innerHTML='';
+  document.querySelector('#modal h2').textContent='Pin a New Card';document.getElementById('btn-save').textContent='Pin to Board';
+  document.getElementById('modal-overlay').classList.add('open');setTimeout(()=>document.getElementById('m-name').focus(),100);
+}
+function openModalForEdit(cc){
+  editingCardId=cc.id;
+  document.getElementById('m-type').value=cc.type;document.getElementById('m-name').value=cc.name;document.getElementById('m-body').value=cc.body;
+  Array.from(document.getElementById('m-invs').options).forEach(o=>o.selected=cc.invs.includes(o.value));
+  const cl=document.getElementById('conn-list');cl.innerHTML='';
+  (cc.connections||[]).forEach(c=>cl.appendChild(buildConnRow(c.to,c.label)));
+  document.querySelector('#modal h2').textContent='Edit Card';document.getElementById('btn-save').textContent='Save Changes';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');editingCardId=null;}
+
+document.getElementById('btn-newcard').addEventListener('click',openModal);
+document.getElementById('btn-cancel').addEventListener('click',closeModal);
+document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))closeModal();});
+document.getElementById('btn-add-conn').addEventListener('click',()=>document.getElementById('conn-list').appendChild(buildConnRow()));
+
+document.getElementById('btn-save').addEventListener('click',()=>{
+  const name=document.getElementById('m-name').value.trim();
+  if(!name){alert('Please enter a name.');return;}
+  const type=document.getElementById('m-type').value;
+  const body=document.getElementById('m-body').value.trim();
+  const invs=Array.from(document.getElementById('m-invs').selectedOptions).map(o=>o.value);
+  const connections=[];
+  document.querySelectorAll('.conn-row').forEach(row=>{
+    const to=row.querySelector('.conn-target').value;
+    const label=row.querySelector('.conn-label').value.trim();
+    if(to)connections.push({to,label,color:'rgba(175,155,125,.95)',sw:2.5,dashed:false});
+  });
+  if(editingCardId){
+    const idx=customCards.findIndex(c=>c.id===editingCardId);
+    if(idx>-1){customCards[idx]={...customCards[idx],type,name,body,invs,connections};renderCustomCard(customCards[idx]);const pos=positions[currentFilter][editingCardId];if(pos){const c=document.getElementById(editingCardId);c.style.left=pos.x+'px';c.style.top=pos.y+'px';}}
+    showToast(`"${name}" updated`);
+  }else{
+    const id='custom-'+Date.now();const cc={id,type,name,body,invs,connections};customCards.push(cc);
+    const card=renderCustomCard(cc);
+    const dropX=(vpEl.clientWidth/2-panX)/scale-130+(Math.random()*80-40);
+    const dropY=(vpEl.clientHeight/2-panY)/scale-90+(Math.random()*80-40);
+    card.style.left=dropX+'px';card.style.top=dropY+'px';
+    positions[currentFilter][id]={x:dropX,y:dropY};
+    if(currentFilter!=='all'&&!invs.includes(currentFilter))card.classList.add('hidden');
+    showToast(`"${name}" pinned to the board`);
+  }
+  drawStrings();saveState();closeModal();
+});
+
+// ═══════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('btn-reset').addEventListener('click',()=>{
+  scale=calcDefaultScale();positions[currentFilter]={};panX=0;panY=0;applyT();
+  applyLayout(currentFilter,false);saveState();
+});
+document.getElementById('btn-zi').addEventListener('click',()=>{scale=Math.min(2.5,scale+0.1);applyT();drawStrings();});
+document.getElementById('btn-zo').addEventListener('click',()=>{scale=Math.max(0.12,scale-0.1);applyT();drawStrings();});
+document.getElementById('btn-clearsave').addEventListener('click',()=>{
+  if(!confirm('Clear ALL saved positions, custom cards, and custom strings?'))return;
+  localStorage.removeItem(STORAGE_KEY);
+  Object.keys(positions).forEach(f=>positions[f]={});customCards=[];customConns=[];
+  document.querySelectorAll('.card.custom').forEach(c=>c.remove());
+  scale=calcDefaultScale();panX=0;panY=0;applyT();applyLayout(currentFilter,false);
+  showToast('Board fully reset');
+});
+document.getElementById('btn-legend-toggle').addEventListener('click',()=>{
+  document.getElementById('legend').classList.toggle('mobile-open');
+});
+
+// ═══════════════════════════════════════════════════════════
+// FILTER
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.fbtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');currentFilter=btn.dataset.f;
+    panX=0;panY=0;applyT();applyLayout(currentFilter,true);saveState();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// TOAST & HINTS
+// ═══════════════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2600);
+}
+let pinchShown=false;
+function showPinchHint(){
+  if(pinchShown)return;pinchShown=true;
+  const h=document.getElementById('pinch-hint');h.classList.add('show');
+  setTimeout(()=>h.classList.remove('show'),2200);
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('load',()=>{
+  scale=calcDefaultScale();applyT();
+  const hasSaved=loadState();
+  document.querySelectorAll('.fbtn').forEach(b=>b.classList.toggle('active',b.dataset.f===currentFilter));
+  customCards.forEach(cc=>renderCustomCard(cc));
+  applyLayout(currentFilter,false);
+  attachDragging();
+  if(hasSaved)showToast('Board restored from last session');
+  if(isMobile()&&!hasSaved)setTimeout(()=>{document.getElementById('pinch-hint').classList.add('show');setTimeout(()=>document.getElementById('pinch-hint').classList.remove('show'),3000);},1500);
+});
+window.addEventListener('resize',()=>{scale=calcDefaultScale();applyT();applyLayout(currentFilter,false);});
+</script>
+</body>
+</html>
