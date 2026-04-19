@@ -483,7 +483,10 @@ body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;wi
 // ═══════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════
-const STORAGE_KEY = 'hexfiles-board-v5';
+const JSONBIN_BIN_ID = '69e4c693856a6821894daa9f';
+const JSONBIN_API_KEY = '$2a$10$6k23lhnenUhkCvNJQYS9cuy1CBNP11d4lIwCpyY/u.jyEVV5B1ylO';
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+
 const isMobile = () => window.innerWidth <= 768;
 const DSIZES = { CW:444, CH:270, GX:120, GY:130, COLS:9 };
 const MSIZES = { CW:250, CH:185, GX:55,  GY:70,  COLS:5 };
@@ -591,27 +594,47 @@ function cardName(id) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// STORAGE
+// STORAGE — JSONBin shared cloud storage
+// All viewers share the same board state.
+// Saves are debounced so rapid drags don't flood the API.
 // ═══════════════════════════════════════════════════════════
+let saveTimer = null;
+
 function saveState() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      positions, customCards, customConns, filter: currentFilter,
-    }));
-  } catch(e) {}
+  // Debounce — wait 1.5s of inactivity before saving
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      const payload = { positions, customCards, customConns, filter: currentFilter };
+      await fetch(JSONBIN_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': JSONBIN_API_KEY,
+          'X-Bin-Versioning': 'false', // overwrite rather than version
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch(e) { console.warn('JSONBin save failed:', e); }
+  }, 1500);
 }
 
-function loadState() {
+async function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    const d = JSON.parse(raw);
+    showToast('Loading board…');
+    const res = await fetch(`${JSONBIN_URL}/latest`, {
+      headers: { 'X-Master-Key': JSONBIN_API_KEY },
+    });
+    if (!res.ok) return false;
+    const json = await res.json();
+    const d = json.record;
+    if (!d) return false;
     if (d.positions) Object.keys(positions).forEach(f => { positions[f] = d.positions[f] || {}; });
-    customCards  = d.customCards  || [];
-    customConns  = d.customConns  || [];
+    customCards   = d.customCards  || [];
+    customConns   = d.customConns  || [];
     currentFilter = d.filter || 'all';
     return true;
-  } catch(e) { return false; }
+  } catch(e) { console.warn('JSONBin load failed:', e); return false; }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1037,13 +1060,13 @@ document.getElementById('btn-reset').addEventListener('click',()=>{
 });
 document.getElementById('btn-zi').addEventListener('click',()=>{scale=Math.min(2.5,scale+0.1);applyT();drawStrings();});
 document.getElementById('btn-zo').addEventListener('click',()=>{scale=Math.max(0.12,scale-0.1);applyT();drawStrings();});
-document.getElementById('btn-clearsave').addEventListener('click',()=>{
-  if(!confirm('Clear ALL saved positions, custom cards, and custom strings?'))return;
-  localStorage.removeItem(STORAGE_KEY);
+document.getElementById('btn-clearsave').addEventListener('click',async ()=>{
+  if(!confirm('Clear ALL saved positions, custom cards, and custom strings for ALL viewers?'))return;
   Object.keys(positions).forEach(f=>positions[f]={});customCards=[];customConns=[];
   document.querySelectorAll('.card.custom').forEach(c=>c.remove());
   scale=calcDefaultScale();panX=0;panY=0;applyT();applyLayout(currentFilter,false);
-  showToast('Board fully reset');
+  await saveState();
+  showToast('Board fully reset for all viewers');
 });
 document.getElementById('btn-legend-toggle').addEventListener('click',()=>{
   document.getElementById('legend').classList.toggle('mobile-open');
@@ -1078,14 +1101,15 @@ function showPinchHint(){
 // ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
-window.addEventListener('load',()=>{
+window.addEventListener('load', async ()=>{
   scale=calcDefaultScale();applyT();
-  const hasSaved=loadState();
+  const hasSaved = await loadState();
   document.querySelectorAll('.fbtn').forEach(b=>b.classList.toggle('active',b.dataset.f===currentFilter));
   customCards.forEach(cc=>renderCustomCard(cc));
   applyLayout(currentFilter,false);
   attachDragging();
-  if(hasSaved)showToast('Board restored from last session');
+  if(hasSaved) showToast('Board loaded ✓');
+  else showToast('Starting fresh board');
   if(isMobile()&&!hasSaved)setTimeout(()=>{document.getElementById('pinch-hint').classList.add('show');setTimeout(()=>document.getElementById('pinch-hint').classList.remove('show'),3000);},1500);
 });
 window.addEventListener('resize',()=>{scale=calcDefaultScale();applyT();applyLayout(currentFilter,false);});
