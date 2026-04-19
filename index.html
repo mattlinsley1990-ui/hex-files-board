@@ -840,17 +840,24 @@ function applyLayout(filter, animate) {
 // For all view: centre on the midpoint of all four hub cards.
 // ═══════════════════════════════════════════════════════════
 function centreOnFilter(filter) {
+  // For individual investigation views, centre on that hub card.
+  // For the all view, centre on the midpoint of all four hub cards.
   const hubIds = filter === 'all'
     ? ['inv-ubergeist', 'inv-bioform', 'inv-feywild', 'inv-fiendish']
-    : [];
+    : [`inv-${filter}`];
 
-  // Gather positions of relevant hub cards
+  // Use card sizes to calculate centre offset rather than offsetWidth/offsetHeight,
+  // which may not be reliable mid-animation.
+  const cardSizes = getCardSizes();
+  const invCardWidth  = cardSizes.CW * 1.2; // investigation cards are 20% wider
+  const invCardHeight = cardSizes.CH * 1.2;
+
   const hubCentrePoints = hubIds.map(id => {
     const el = document.getElementById(id);
     if (!el || el.classList.contains('hidden')) return null;
     return {
-      x: parseFloat(el.style.left) + el.offsetWidth  / 2,
-      y: parseFloat(el.style.top)  + el.offsetHeight / 2,
+      x: parseFloat(el.style.left) + invCardWidth  / 2,
+      y: parseFloat(el.style.top)  + invCardHeight / 2,
     };
   }).filter(Boolean);
 
@@ -861,8 +868,8 @@ function centreOnFilter(filter) {
   const centreY = hubCentrePoints.reduce((sum, point) => sum + point.y, 0) / hubCentrePoints.length;
 
   // Set pan so that midpoint lands at the centre of the viewport
-  panX = viewportEl.clientWidth  / 2 - cx * scale;
-  panY = viewportEl.clientHeight / 2 - cy * scale;
+  panX = viewportEl.clientWidth  / 2 - centreX * scale;
+  panY = viewportEl.clientHeight / 2 - centreY * scale;
   applyTransform();
 }
 
