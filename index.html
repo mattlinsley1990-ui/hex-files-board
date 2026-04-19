@@ -242,10 +242,108 @@ body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;wi
 #toast.show{opacity:1;}
 #pinch-hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--ui-bg);border:1px solid var(--ui-border);color:var(--cork-light);font-family:'Courier Prime',monospace;font-size:14px;padding:16px 24px;border-radius:3px;z-index:2500;opacity:0;transition:opacity .4s;pointer-events:none;text-align:center;line-height:1.7;}
 #pinch-hint.show{opacity:1;}
+
+/* ── LOADING SCREEN ── */
+#loading-screen{
+  position:fixed;inset:0;z-index:5000;
+  background-color:var(--cork);
+  background-image:
+    radial-gradient(ellipse at 25% 30%,#d4a06a 0%,transparent 55%),
+    radial-gradient(ellipse at 75% 70%,#b8803a 0%,transparent 55%),
+    radial-gradient(ellipse at 50% 50%,#c8955c 0%,#a87040 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .7s ease;
+}
+#loading-screen::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:
+    repeating-linear-gradient(87deg,transparent 0,transparent 20px,rgba(90,55,15,.04) 20px,rgba(90,55,15,.04) 21px),
+    repeating-linear-gradient(93deg,transparent 0,transparent 35px,rgba(70,40,10,.03) 35px,rgba(70,40,10,.03) 36px);
+}
+#loading-screen.fade-out{opacity:0;pointer-events:none;}
+#loading-frame{
+  position:absolute;inset:0;
+  border:26px solid var(--frame);
+  box-shadow:inset 0 0 0 6px var(--frame-inner),inset 0 0 60px rgba(0,0,0,.5);
+  pointer-events:none;
+}
+#loading-content{
+  position:relative;z-index:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;
+  width:80%;max-width:900px;
+}
+#loading-title{
+  font-family:'Special Elite',cursive;
+  font-size:clamp(36px,6vw,90px);
+  color:#2c1810;
+  line-height:1.1;
+  margin-bottom:0.2em;
+  text-shadow:2px 3px 8px rgba(0,0,0,.2);
+}
+#loading-subtitle{
+  font-family:'Oswald',sans-serif;
+  font-size:clamp(18px,3vw,48px);
+  font-weight:300;
+  letter-spacing:4px;
+  text-transform:uppercase;
+  color:#3a2010;
+  margin-bottom:0.6em;
+  text-shadow:1px 2px 6px rgba(0,0,0,.15);
+}
+#loading-label{
+  font-family:'Oswald',sans-serif;
+  font-size:clamp(14px,2vw,32px);
+  font-weight:600;
+  letter-spacing:6px;
+  text-transform:uppercase;
+  color:#5c3a1e;
+  margin-bottom:1.2em;
+  animation:loadpulse 1.4s ease-in-out infinite;
+}
+@keyframes loadpulse{0%,100%{opacity:1;}50%{opacity:.45;}}
+#loading-bar-wrap{
+  width:60%;max-width:600px;min-width:280px;
+  background:rgba(80,45,10,.25);
+  border:2px solid rgba(80,45,10,.35);
+  border-radius:4px;
+  height:22px;
+  overflow:hidden;
+  margin-bottom:0.7em;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.2);
+}
+#loading-bar{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,#a0703a,#c8955c,#d9a96e);
+  border-radius:2px;
+  transition:width .5s cubic-bezier(.4,0,.2,1);
+  box-shadow:0 0 12px rgba(200,149,92,.5);
+}
+#loading-status{
+  font-family:'Courier Prime',monospace;
+  font-size:clamp(11px,1.4vw,20px);
+  color:#5c3a1e;
+  font-style:italic;
+  min-height:1.5em;
+  text-align:center;
+}
 </style>
 </head>
 <body>
 <div id="frame"></div>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <div id="loading-frame"></div>
+  <div id="loading-content">
+    <div id="loading-title">The HEX Files</div>
+    <div id="loading-subtitle">Veritas Investigation Board</div>
+    <div id="loading-label">Loading...</div>
+    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+    <div id="loading-status">Connecting to JSONBin...</div>
+  </div>
+</div>
+
 <div id="string-banner">STRING MODE — Click a card to start, then click another to connect them. Press Escape to cancel.</div>
 
 <div id="filter-bar">
@@ -619,9 +717,23 @@ function saveState() {
   }, 1500);
 }
 
+// ═══════════════════════════════════════════════════════════
+// LOADING SCREEN
+// ═══════════════════════════════════════════════════════════
+function setProgress(pct, status) {
+  document.getElementById('loading-bar').style.width = pct + '%';
+  document.getElementById('loading-status').textContent = status;
+}
+
+function hideLoadingScreen() {
+  const screen = document.getElementById('loading-screen');
+  screen.classList.add('fade-out');
+  setTimeout(() => screen.style.display = 'none', 750);
+}
+
 async function loadState() {
   try {
-    showToast('Loading board…');
+    setProgress(10, 'Connecting to JSONBin...');
     const res = await fetch(`${JSONBIN_URL}/latest`, {
       headers: {
         'X-Master-Key': JSONBIN_API_KEY,
@@ -630,8 +742,10 @@ async function loadState() {
     });
     if (!res.ok) {
       console.warn('JSONBin load failed — status:', res.status);
+      setProgress(100, 'Starting fresh board...');
       return false;
     }
+    setProgress(50, 'Restoring board state...');
     const d = await res.json();
     if (!d) return false;
     if (d.positions) Object.keys(positions).forEach(f => { positions[f] = d.positions[f] || {}; });
@@ -709,7 +823,43 @@ function applyLayout(filter, animate) {
     card.style.transform=`rotate(${rot}deg)`;
   });
 
+  // Centre the view on the relevant hub card(s) after layout settles
+  const centreDelay = animate ? 570 : 70;
+  setTimeout(() => centreOnFilter(filter), centreDelay);
+
   setTimeout(drawStrings, animate?560:60);
+}
+
+// ═══════════════════════════════════════════════════════════
+// CENTRE ON FILTER
+// For individual investigation views: centre on the hub card.
+// For all view: centre on the midpoint of all four hub cards.
+// ═══════════════════════════════════════════════════════════
+function centreOnFilter(filter) {
+  const hubIds = filter === 'all'
+    ? ['inv-ubergeist', 'inv-bioform', 'inv-feywild', 'inv-fiendish']
+    : [];
+
+  // Gather positions of relevant hub cards
+  const pts = hubIds.map(id => {
+    const el = document.getElementById(id);
+    if (!el || el.classList.contains('hidden')) return null;
+    return {
+      x: parseFloat(el.style.left) + el.offsetWidth  / 2,
+      y: parseFloat(el.style.top)  + el.offsetHeight / 2,
+    };
+  }).filter(Boolean);
+
+  if (!pts.length) return;
+
+  // Calculate midpoint of all hub cards
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+
+  // Set pan so that midpoint lands at the centre of the viewport
+  panX = vpEl.clientWidth  / 2 - cx * scale;
+  panY = vpEl.clientHeight / 2 - cy * scale;
+  applyT();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1084,7 +1234,7 @@ document.querySelectorAll('.fbtn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentFilter=btn.dataset.f;
-    panX=0;panY=0;applyT();applyLayout(currentFilter,true);saveState();
+    applyLayout(currentFilter,true);saveState();
   });
 });
 
@@ -1109,13 +1259,22 @@ function showPinchHint(){
 window.addEventListener('load', async ()=>{
   scale=calcDefaultScale();applyT();
   const hasSaved = await loadState();
+  setProgress(70, 'Positioning cards...');
   document.querySelectorAll('.fbtn').forEach(b=>b.classList.toggle('active',b.dataset.f===currentFilter));
   customCards.forEach(cc=>renderCustomCard(cc));
   applyLayout(currentFilter,false);
   attachDragging();
-  if(hasSaved) showToast('Board loaded ✓');
-  else showToast('Starting fresh board');
-  if(isMobile()&&!hasSaved)setTimeout(()=>{document.getElementById('pinch-hint').classList.add('show');setTimeout(()=>document.getElementById('pinch-hint').classList.remove('show'),3000);},1500);
+  setProgress(90, 'Centring view...');
+  // Wait for layout and centring to settle, then hide loading screen
+  setTimeout(()=>{
+    setProgress(100, 'Ready!');
+    setTimeout(()=>{
+      hideLoadingScreen();
+      if(hasSaved) showToast('Board loaded ✓');
+      else showToast('Starting fresh board');
+      if(isMobile()&&!hasSaved)setTimeout(()=>{document.getElementById('pinch-hint').classList.add('show');setTimeout(()=>document.getElementById('pinch-hint').classList.remove('show'),3000);},1500);
+    }, 400);
+  }, 700);
 });
 window.addEventListener('resize',()=>{scale=calcDefaultScale();applyT();applyLayout(currentFilter,false);});
 </script>
