@@ -484,7 +484,7 @@ body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;wi
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════
 const JSONBIN_BIN_ID = '69e4c693856a6821894daa9f';
-const JSONBIN_API_KEY = '$2a$10$6k23lhnenUhkCvNJQYS9cuy1CBNP11d4lIwCpyY/u.jyEVV5B1ylO';
+const JSONBIN_API_KEY = '$2a$10$lky0/Y.3AJ9dRxY1N60xM.IhFHBctlI3fOCN3jdT0HA0qU480qQBC';
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
 const isMobile = () => window.innerWidth <= 768;
@@ -610,7 +610,7 @@ function saveState() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'X-Access-Key': JSONBIN_API_KEY,
+          'X-Master-Key': JSONBIN_API_KEY,
           'X-Bin-Versioning': 'false', // overwrite rather than version
         },
         body: JSON.stringify(payload),
@@ -624,7 +624,7 @@ async function loadState() {
     showToast('Loading board…');
     const res = await fetch(`${JSONBIN_URL}/latest`, {
       headers: {
-        'X-Access-Key': JSONBIN_API_KEY,
+        'X-Master-Key': JSONBIN_API_KEY,
         'X-Bin-Meta': 'false',
       },
     });
