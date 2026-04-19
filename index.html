@@ -35,7 +35,7 @@ body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;wi
 #strings{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
 .sp{fill:none;stroke-linecap:round;filter:drop-shadow(1px 2px 3px rgba(0,0,0,.4));}
 .sl{font-family:'Courier Prime',monospace;fill:rgba(30,12,4,.88);font-style:italic;pointer-events:none;}
-.slb{fill:rgba(215,192,155,.88);}
+
 
 /* ── CARDS ── */
 .card{position:absolute;border-radius:3px;box-shadow:4px 6px 18px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.55);touch-action:none;cursor:grab;}
@@ -586,9 +586,9 @@ const JSONBIN_API_KEY = '$2a$10$lky0/Y.3AJ9dRxY1N60xM.IhFHBctlI3fOCN3jdT0HA0qU48
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
 const isMobile = () => window.innerWidth <= 768;
-const DSIZES = { CW:444, CH:270, GX:120, GY:130, COLS:9 };
-const MSIZES = { CW:250, CH:185, GX:55,  GY:70,  COLS:5 };
-const SZ = () => isMobile() ? MSIZES : DSIZES;
+const DESKTOP_SIZES = { CW:444, CH:270, GX:120, GY:130, COLS:9 };
+const MOBILE_SIZES = { CW:250, CH:185, GX:55,  GY:70,  COLS:5 };
+const getCardSizes = () => isMobile() ? MOBILE_SIZES : DESKTOP_SIZES;
 
 // ═══════════════════════════════════════════════════════════
 // STATE
@@ -601,9 +601,9 @@ let customConns  = []; // manually drawn strings: [{id, from, to, label}]
 let stringMode   = false;
 let stringFrom   = null; // card id of first click in string mode
 
-const boardEl   = document.getElementById('board');
-const vpEl      = document.getElementById('viewport');
-const stringSVG = document.getElementById('strings');
+const boardEl      = document.getElementById('board');
+const viewportEl   = document.getElementById('viewport');
+const stringSVG    = document.getElementById('strings');
 
 // ═══════════════════════════════════════════════════════════
 // BUILT-IN CONNECTIONS — added SPQ → Veil Division
@@ -759,41 +759,43 @@ async function loadState() {
 // ═══════════════════════════════════════════════════════════
 // TRANSFORM
 // ═══════════════════════════════════════════════════════════
-function applyT() {
+function applyTransform() {
   boardEl.style.transform = `translate(${panX}px,${panY}px) scale(${scale})`;
 }
 
 function calcDefaultScale() {
   const dpr = window.devicePixelRatio || 1;
-  const sz  = SZ();
-  const vw  = vpEl.clientWidth;
-  const fit = (vw / (sz.COLS * (sz.CW + sz.GX))) * (dpr > 1.5 ? dpr * 0.7 : 1);
+  const cardSizes = getCardSizes();
+  const vw  = viewportEl.clientWidth;
+  const fit = (vw / (cardSizes.COLS * (cardSizes.CW + cardSizes.GX))) * (dpr > 1.5 ? dpr * 0.7 : 1);
   return Math.min(isMobile() ? 1.1 : 1.4, Math.max(0.12, fit));
 }
 
 // ═══════════════════════════════════════════════════════════
 // LAYOUT ENGINE
 // ═══════════════════════════════════════════════════════════
-function gridPx(col, row, ox, oy) {
-  const sz = SZ();
-  return { x: ox + col*(sz.CW+sz.GX), y: oy + row*(sz.CH+sz.GY) };
+function gridPositionFromCell(col, row, originX, originY) {
+  const cardSizes = getCardSizes();
+  return { x: originX + col*(cardSizes.CW+cardSizes.GX), y: originY + row*(cardSizes.CH+cardSizes.GY) };
 }
 
-function gridBounds(layout) {
-  const sz = SZ();
+function calculateLayoutBounds(layout) {
+  const cardSizes = getCardSizes();
   let mc=0, mr=0;
   Object.values(layout).forEach(([c,r]) => { mc=Math.max(mc,c); mr=Math.max(mr,r); });
-  return { w:(mc+1)*(sz.CW+sz.GX)-sz.GX, h:(mr+1)*(sz.CH+sz.GY)-sz.GY };
+  return { w:(mc+1)*(cardSizes.CW+cardSizes.GX)-cardSizes.GX, h:(mr+1)*(cardSizes.CH+cardSizes.GY)-cardSizes.GY };
 }
 
 function applyLayout(filter, animate) {
   const layout = GRID_LAYOUTS[filter];
   if (!layout) return;
-  const fp = positions[filter];
-  const sz = SZ();
-  const vw = vpEl.clientWidth/scale, vh = vpEl.clientHeight/scale;
-  const {w,h} = gridBounds(layout);
-  const ox = Math.max(40,(vw-w)/2), oy = Math.max(60,(vh-h)/2);
+  const filterPositions = positions[filter];
+  const cardSizes = getCardSizes();
+  const viewportWidth  = viewportEl.clientWidth  / scale;
+  const viewportHeight = viewportEl.clientHeight / scale;
+  const { w: layoutWidth, h: layoutHeight } = calculateLayoutBounds(layout);
+  const originX = Math.max(40, (viewportWidth - layoutWidth) / 2);
+  const originY = Math.max(60, (viewportHeight - layoutHeight) / 2);
 
   const visibleIds = new Set(Object.keys(layout));
   customCards.forEach(cc => { if (filter==='all'||cc.invs.includes(filter)) visibleIds.add(cc.id); });
@@ -806,13 +808,15 @@ function applyLayout(filter, animate) {
     card.classList.remove('hidden');
 
     let tx, ty;
-    if (fp[id]) { tx=fp[id].x; ty=fp[id].y; }
+    if (filterPositions[id]) { tx=filterPositions[id].x; ty=filterPositions[id].y; }
     else if (layout[id]) {
-      const [col,row]=layout[id]; const p=gridPx(col,row,ox,oy);
-      tx=p.x; ty=p.y; fp[id]={x:tx,y:ty};
+      const [col,row]=layout[id]; const gridPos = gridPositionFromCell(col, row, originX, originY);
+      tx = gridPos.x; ty = gridPos.y; filterPositions[id] = { x: tx, y: ty };
     } else {
       const idx=customCards.findIndex(c=>c.id===id);
-      tx=ox+w+80; ty=oy+idx*(sz.CH+70); fp[id]={x:tx,y:ty};
+      tx = originX + layoutWidth + 80;
+      ty = originY + idx * (cardSizes.CH + 70);
+      filterPositions[id] = { x: tx, y: ty };
     }
 
     if (animate) { card.classList.add('animating'); setTimeout(()=>card.classList.remove('animating'),620); }
@@ -841,7 +845,7 @@ function centreOnFilter(filter) {
     : [];
 
   // Gather positions of relevant hub cards
-  const pts = hubIds.map(id => {
+  const hubCentrePoints = hubIds.map(id => {
     const el = document.getElementById(id);
     if (!el || el.classList.contains('hidden')) return null;
     return {
@@ -850,22 +854,22 @@ function centreOnFilter(filter) {
     };
   }).filter(Boolean);
 
-  if (!pts.length) return;
+  if (!hubCentrePoints.length) return;
 
   // Calculate midpoint of all hub cards
-  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+  const centreX = hubCentrePoints.reduce((sum, point) => sum + point.x, 0) / hubCentrePoints.length;
+  const centreY = hubCentrePoints.reduce((sum, point) => sum + point.y, 0) / hubCentrePoints.length;
 
   // Set pan so that midpoint lands at the centre of the viewport
-  panX = vpEl.clientWidth  / 2 - cx * scale;
-  panY = vpEl.clientHeight / 2 - cy * scale;
-  applyT();
+  panX = viewportEl.clientWidth  / 2 - cx * scale;
+  panY = viewportEl.clientHeight / 2 - cy * scale;
+  applyTransform();
 }
 
 // ═══════════════════════════════════════════════════════════
 // STRINGS
 // ═══════════════════════════════════════════════════════════
-function cardCentre(id) {
+function getCardCentre(id) {
   const el = document.getElementById(id);
   if (!el||el.classList.contains('hidden')) return null;
   return { x:parseFloat(el.style.left)+el.offsetWidth/2, y:parseFloat(el.style.top)+el.offsetHeight/2 };
@@ -884,32 +888,52 @@ function drawStrings() {
     ...customCards.flatMap(cc=>(cc.connections||[]).map(conn=>({from:cc.id,to:conn.to,color:'rgba(175,155,125,.95)',sw:2.5,label:conn.label,dashed:false}))),
   ];
 
-  allConns.forEach(({from,to,color,sw,label,dashed},i)=>{
-    let f=cardCentre(from), t=cardCentre(to);
-    if(!f||!t)return;
-    if(f.x>t.x){[f,t]=[t,f];}
-    const dx=t.x-f.x,dy=t.y-f.y,dist=Math.sqrt(dx*dx+dy*dy);
-    const mx=(f.x+t.x)/2,my=(f.y+t.y)/2+dist*0.11;
-    const d=`M${f.x} ${f.y} Q${mx} ${my} ${t.x} ${t.y}`;
-    const pid=`p${i}`;
+  allConns.forEach(({ from, to, color, sw: strokeWidth, label, dashed }, i) => {
+    let fromPoint = getCardCentre(from), toPoint = getCardCentre(to);
+    if (!fromPoint || !toPoint) return;
+    if (fromPoint.x > toPoint.x) { [fromPoint, toPoint] = [toPoint, fromPoint]; }
+    const deltaX = toPoint.x - fromPoint.x;
+    const deltaY = toPoint.y - fromPoint.y;
+    const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    const midX = (fromPoint.x + toPoint.x) / 2;
+    const midY = (fromPoint.y + toPoint.y) / 2 + dist * 0.11;
+    const pathData = `M${fromPoint.x} ${fromPoint.y} Q${midX} ${midY} ${toPoint.x} ${toPoint.y}`;
+    const pathId = `string-path-${i}`;
     const dp=document.createElementNS('http://www.w3.org/2000/svg','path');
-    dp.setAttribute('id',pid);dp.setAttribute('d',d);defs.appendChild(dp);
+    dp.setAttribute('id', pathId);
+    dp.setAttribute('d', pathData);
+    defs.appendChild(dp);
     const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-    path.setAttribute('d',d);path.setAttribute('stroke',color);
-    path.setAttribute('stroke-width',mobile?sw*1.3:sw);
-    path.classList.add('sp');if(dashed)path.setAttribute('stroke-dasharray','10,7');
+    path.setAttribute('d', pathData);
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', isMobile() ? strokeWidth * 1.3 : strokeWidth);
+    path.classList.add('sp');
+    if (dashed) path.setAttribute('stroke-dasharray', '10,7');
     stringSVG.appendChild(path);
-    if(label&&dist>100&&showLabels){
-      const cw=mobile?8:11.5,lw=label.length*cw+20,lh=mobile?17:26;
-      const bg=document.createElementNS('http://www.w3.org/2000/svg','rect');
-      bg.setAttribute('x',mx-lw/2);bg.setAttribute('y',my-lh/2-2);
-      bg.setAttribute('width',lw);bg.setAttribute('height',lh);bg.setAttribute('rx',4);
-      bg.classList.add('slb');stringSVG.appendChild(bg);
-      const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
-      txt.classList.add('sl');txt.style.fontSize=fontSize+'px';
-      const tp=document.createElementNS('http://www.w3.org/2000/svg','textPath');
-      tp.setAttribute('href',`#${pid}`);tp.setAttribute('startOffset','50%');tp.setAttribute('text-anchor','middle');
-      tp.textContent=label;txt.appendChild(tp);stringSVG.appendChild(txt);
+    if (label && dist > 100 && showLabels) {
+      // Outline text — stroked background travels with the text along the path,
+      // eliminating the orphaned-box artefact caused by a fixed-position rect.
+      const makeTextPathElement = (isOutline) => {
+        const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+        txt.classList.add('sl');
+        txt.style.fontSize=fontSize+'px';
+        if(isOutline){
+          txt.style.stroke='rgba(210,185,150,.9)';
+          txt.style.strokeWidth=mobile?'4px':'5px';
+          txt.style.strokeLinejoin='round';
+          txt.style.paintOrder='stroke';
+          txt.style.fill='rgba(210,185,150,.9)';
+        }
+        const tp=document.createElementNS('http://www.w3.org/2000/svg','textPath');
+        tp.setAttribute('href', `#${pathId}`);
+        tp.setAttribute('startOffset','50%');
+        tp.setAttribute('text-anchor','middle');
+        tp.textContent=label;
+        txt.appendChild(tp);
+        return txt;
+      };
+      stringSVG.appendChild(makeTextPathElement(true));  // background stroke layer
+      stringSVG.appendChild(makeTextPathElement(false)); // foreground text layer
     }
   });
 }
@@ -919,7 +943,7 @@ function drawStrings() {
 // ═══════════════════════════════════════════════════════════
 function enterStringMode() {
   stringMode=true; stringFrom=null;
-  vpEl.classList.add('string-mode');
+  viewportEl.classList.add('string-mode');
   document.getElementById('string-banner').classList.add('show');
   document.getElementById('btn-drawstring').classList.add('active-mode');
   document.getElementById('btn-drawstring').textContent='✕ CANCEL STRING';
@@ -927,7 +951,7 @@ function enterStringMode() {
 
 function exitStringMode() {
   stringMode=false; stringFrom=null;
-  vpEl.classList.remove('string-mode');
+  viewportEl.classList.remove('string-mode');
   document.getElementById('string-banner').classList.remove('show');
   document.getElementById('btn-drawstring').classList.remove('active-mode');
   document.getElementById('btn-drawstring').textContent='〰 DRAW STRING';
@@ -1021,25 +1045,32 @@ function renderManageList(){
 // ═══════════════════════════════════════════════════════════
 // MOUSE PAN
 // ═══════════════════════════════════════════════════════════
-let mousePanning=false,mpsx,mpsy,mppx,mppy;
-vpEl.addEventListener('mousedown',e=>{
+let mousePanning = false;
+let mousePanStartX, mousePanStartY, mousePanOriginX, mousePanOriginY;
+viewportEl.addEventListener('mousedown',e=>{
   if(e.target.closest('.card')||stringMode)return;
-  mousePanning=true;mpsx=e.clientX;mpsy=e.clientY;mppx=panX;mppy=panY;
-  vpEl.classList.add('panning');
+  mousePanning = true;
+  mousePanStartX = e.clientX;
+  mousePanStartY = e.clientY;
+  mousePanOriginX = panX;
+  mousePanOriginY = panY;
+  viewportEl.classList.add('panning');
 });
 document.addEventListener('mousemove',e=>{
   if(!mousePanning||draggingCard)return;
-  panX=mppx+(e.clientX-mpsx);panY=mppy+(e.clientY-mpsy);applyT();
+  panX = mousePanOriginX + (e.clientX - mousePanStartX);
+  panY = mousePanOriginY + (e.clientY - mousePanStartY);
+  applyTransform();
 });
-document.addEventListener('mouseup',()=>{mousePanning=false;vpEl.classList.remove('panning');});
-vpEl.addEventListener('wheel',e=>{
+document.addEventListener('mouseup',()=>{mousePanning=false;viewportEl.classList.remove('panning');});
+viewportEl.addEventListener('wheel',e=>{
   e.preventDefault();
   scale=Math.min(2.5,Math.max(0.12,scale+(e.deltaY>0?-0.05:0.05)));
-  applyT();drawStrings();
+  applyTransform();drawStrings();
 },{passive:false});
 
 // String-mode hover highlight
-vpEl.addEventListener('mousemove',e=>{
+viewportEl.addEventListener('mousemove',e=>{
   if(!stringMode||!stringFrom)return;
   const card=e.target.closest('.card');
   document.querySelectorAll('.card.string-hover').forEach(c=>c.classList.remove('string-hover'));
@@ -1052,33 +1083,51 @@ vpEl.addEventListener('mousemove',e=>{
 // ═══════════════════════════════════════════════════════════
 let touchState=null;
 function getDist(t1,t2){const dx=t1.clientX-t2.clientX,dy=t1.clientY-t2.clientY;return Math.sqrt(dx*dx+dy*dy);}
-vpEl.addEventListener('touchstart',e=>{
+viewportEl.addEventListener('touchstart',e=>{
   if(e.target.closest('.card'))return;
   e.preventDefault();
-  if(e.touches.length===1){touchState={type:'pan',sx:e.touches[0].clientX,sy:e.touches[0].clientY,spx:panX,spy:panY};}
-  else if(e.touches.length===2){touchState={type:'pinch',startDist:getDist(e.touches[0],e.touches[1]),startScale:scale};showPinchHint();}
+  if (e.touches.length === 1) {
+    touchState = { type: 'pan', startX: e.touches[0].clientX, startY: e.touches[0].clientY, originPanX: panX, originPanY: panY };
+  }
+  else if (e.touches.length === 2) {
+    touchState = { type: 'pinch', startDistance: getDist(e.touches[0], e.touches[1]), startScale: scale };
+    showPinchHint();
+  }
 },{passive:false});
-vpEl.addEventListener('touchmove',e=>{
+viewportEl.addEventListener('touchmove',e=>{
   e.preventDefault();
   if(!touchState||draggingCard)return;
-  if(touchState.type==='pan'&&e.touches.length===1){panX=touchState.spx+(e.touches[0].clientX-touchState.sx);panY=touchState.spy+(e.touches[0].clientY-touchState.sy);applyT();}
-  else if(touchState.type==='pinch'&&e.touches.length===2){scale=Math.min(2.5,Math.max(0.12,touchState.startScale*(getDist(e.touches[0],e.touches[1])/touchState.startDist)));applyT();}
+  if (touchState.type === 'pan' && e.touches.length === 1) {
+    panX = touchState.originPanX + (e.touches[0].clientX - touchState.startX);
+    panY = touchState.originPanY + (e.touches[0].clientY - touchState.startY);
+    applyTransform();
+  }
+  else if (touchState.type === 'pinch' && e.touches.length === 2) {
+    scale = Math.min(2.5, Math.max(0.12, touchState.startScale * (getDist(e.touches[0], e.touches[1]) / touchState.startDistance)));
+    applyTransform();
+  }
 },{passive:false});
-vpEl.addEventListener('touchend',e=>{
+viewportEl.addEventListener('touchend',e=>{
   if(e.touches.length===0){touchState=null;drawStrings();}
-  else if(e.touches.length===1&&touchState?.type==='pinch'){touchState={type:'pan',sx:e.touches[0].clientX,sy:e.touches[0].clientY,spx:panX,spy:panY};}
+  else if (e.touches.length === 1 && touchState?.type === 'pinch') {
+    touchState = { type: 'pan', startX: e.touches[0].clientX, startY: e.touches[0].clientY, originPanX: panX, originPanY: panY };
+  }
 });
 
 // ═══════════════════════════════════════════════════════════
 // CARD DRAGGING — all cards, per-filter position saving
 // ═══════════════════════════════════════════════════════════
-let draggingCard=null,dsx,dsy,dox,doy;
+let draggingCard = null;
+let dragStartX, dragStartY, dragOriginX, dragOriginY;
 
 function makeDraggable(card){
   const onStart=(cx,cy)=>{
     if(stringMode){handleStringClick(card);return;}
-    draggingCard=card;dsx=cx;dsy=cy;
-    dox=parseFloat(card.style.left)||0;doy=parseFloat(card.style.top)||0;
+    draggingCard = card;
+    dragStartX = cx;
+    dragStartY = cy;
+    dragOriginX = parseFloat(card.style.left) || 0;
+    dragOriginY = parseFloat(card.style.top) || 0;
     card.classList.add('dragging-card');card.style.zIndex=600;
   };
   card.addEventListener('mousedown',e=>{if(e.target.closest('button'))return;e.stopPropagation();onStart(e.clientX,e.clientY);});
@@ -1087,8 +1136,8 @@ function makeDraggable(card){
 
 const onDragMove=(cx,cy)=>{
   if(!draggingCard)return;
-  draggingCard.style.left=(dox+(cx-dsx)/scale)+'px';
-  draggingCard.style.top =(doy+(cy-dsy)/scale)+'px';
+  draggingCard.style.left = (dragOriginX + (cx - dragStartX) / scale) + 'px';
+  draggingCard.style.top  = (dragOriginY + (cy - dragStartY) / scale) + 'px';
   drawStrings();
 };
 document.addEventListener('mousemove',e=>onDragMove(e.clientX,e.clientY));
@@ -1133,20 +1182,23 @@ function buildConnRow(targetId='',label=''){
   return row;
 }
 
-function renderCustomCard(cc){
-  const existing=document.getElementById(cc.id);if(existing)existing.remove();
+function renderCustomCard(customCard){
+  const existing = document.getElementById(customCard.id);
+  if (existing) existing.remove();
   const card=document.createElement('div');
   card.className='card custom';card.id=cc.id;card.dataset.invs=cc.invs.join(' ');card.style.zIndex=40;
-  const dots=cc.invs.map(inv=>`<div class="dot" style="background:var(--${inv})"></div>`).join('');
+  const dotHtml = customCard.invs.map(inv => `<div class="dot" style="background:var(--${inv})"></div>`).join('');
   card.innerHTML=`<div class="ct">${cc.type}</div><div class="cn">${cc.name}</div><div class="cb">${cc.body}</div>${cc.invs.length?`<div class="dots">${dots}</div>`:''}<div class="card-actions"><button class="edit-card" type="button">✎ Edit</button><button class="del del-card" type="button">✕ Remove</button></div>`;
-  card.querySelector('.edit-card').addEventListener('click',e=>{e.stopPropagation();openModalForEdit(cc);});
+  card.querySelector('.edit-card').addEventListener('click', e => { e.stopPropagation(); openModalForEdit(customCard); });
   card.querySelector('.del-card').addEventListener('click',e=>{
     e.stopPropagation();if(!confirm(`Remove "${cc.name}"?`))return;
-    customCards=customCards.filter(c=>c.id!==cc.id);
+    customCards = customCards.filter(card => card.id !== customCard.id);
     Object.keys(positions).forEach(f=>delete positions[f][cc.id]);
     card.remove();drawStrings();saveState();showToast(`"${cc.name}" removed`);
   });
-  boardEl.appendChild(card);makeDraggable(card);return card;
+  boardEl.appendChild(card);
+  makeDraggable(card);
+  return card;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1161,12 +1213,15 @@ function openModal(){
   document.querySelector('#modal h2').textContent='Pin a New Card';document.getElementById('btn-save').textContent='Pin to Board';
   document.getElementById('modal-overlay').classList.add('open');setTimeout(()=>document.getElementById('m-name').focus(),100);
 }
-function openModalForEdit(cc){
-  editingCardId=cc.id;
-  document.getElementById('m-type').value=cc.type;document.getElementById('m-name').value=cc.name;document.getElementById('m-body').value=cc.body;
-  Array.from(document.getElementById('m-invs').options).forEach(o=>o.selected=cc.invs.includes(o.value));
-  const cl=document.getElementById('conn-list');cl.innerHTML='';
-  (cc.connections||[]).forEach(c=>cl.appendChild(buildConnRow(c.to,c.label)));
+function openModalForEdit(customCard) {
+  editingCardId = customCard.id;
+  document.getElementById('m-type').value = customCard.type;
+  document.getElementById('m-name').value = customCard.name;
+  document.getElementById('m-body').value = customCard.body;
+  Array.from(document.getElementById('m-invs').options).forEach(opt => { opt.selected = customCard.invs.includes(opt.value); });
+  const connectionList = document.getElementById('conn-list');
+  connectionList.innerHTML = '';
+  (customCard.connections || []).forEach(conn => connectionList.appendChild(buildConnRow(conn.to, conn.label)));
   document.querySelector('#modal h2').textContent='Edit Card';document.getElementById('btn-save').textContent='Save Changes';
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -1174,7 +1229,7 @@ function closeModal(){document.getElementById('modal-overlay').classList.remove(
 
 document.getElementById('btn-newcard').addEventListener('click',openModal);
 document.getElementById('btn-cancel').addEventListener('click',closeModal);
-document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))closeModal();});
+document.getElementById('modal-overlay').addEventListener('click',e=>{if (e.target === document.getElementById('modal-overlay')) closeModal();});
 document.getElementById('btn-add-conn').addEventListener('click',()=>document.getElementById('conn-list').appendChild(buildConnRow()));
 
 document.getElementById('btn-save').addEventListener('click',()=>{
@@ -1194,10 +1249,12 @@ document.getElementById('btn-save').addEventListener('click',()=>{
     if(idx>-1){customCards[idx]={...customCards[idx],type,name,body,invs,connections};renderCustomCard(customCards[idx]);const pos=positions[currentFilter][editingCardId];if(pos){const c=document.getElementById(editingCardId);c.style.left=pos.x+'px';c.style.top=pos.y+'px';}}
     showToast(`"${name}" updated`);
   }else{
-    const id='custom-'+Date.now();const cc={id,type,name,body,invs,connections};customCards.push(cc);
-    const card=renderCustomCard(cc);
-    const dropX=(vpEl.clientWidth/2-panX)/scale-130+(Math.random()*80-40);
-    const dropY=(vpEl.clientHeight/2-panY)/scale-90+(Math.random()*80-40);
+    const id = 'custom-' + Date.now();
+    const newCustomCard = { id, type, name, body, invs, connections };
+    customCards.push(newCustomCard);
+    const card = renderCustomCard(newCustomCard);
+    const dropX=(viewportEl.clientWidth/2-panX)/scale-130+(Math.random()*80-40);
+    const dropY=(viewportEl.clientHeight/2-panY)/scale-90+(Math.random()*80-40);
     card.style.left=dropX+'px';card.style.top=dropY+'px';
     positions[currentFilter][id]={x:dropX,y:dropY};
     if(currentFilter!=='all'&&!invs.includes(currentFilter))card.classList.add('hidden');
@@ -1210,16 +1267,16 @@ document.getElementById('btn-save').addEventListener('click',()=>{
 // CONTROLS
 // ═══════════════════════════════════════════════════════════
 document.getElementById('btn-reset').addEventListener('click',()=>{
-  scale=calcDefaultScale();positions[currentFilter]={};panX=0;panY=0;applyT();
+  scale=calcDefaultScale();positions[currentFilter]={};panX=0;panY=0;applyTransform();
   applyLayout(currentFilter,false);saveState();
 });
-document.getElementById('btn-zi').addEventListener('click',()=>{scale=Math.min(2.5,scale+0.1);applyT();drawStrings();});
-document.getElementById('btn-zo').addEventListener('click',()=>{scale=Math.max(0.12,scale-0.1);applyT();drawStrings();});
+document.getElementById('btn-zi').addEventListener('click',()=>{scale=Math.min(2.5,scale+0.1);applyTransform();drawStrings();});
+document.getElementById('btn-zo').addEventListener('click',()=>{scale=Math.max(0.12,scale-0.1);applyTransform();drawStrings();});
 document.getElementById('btn-clearsave').addEventListener('click',async ()=>{
   if(!confirm('Clear ALL saved positions, custom cards, and custom strings for ALL viewers?'))return;
   Object.keys(positions).forEach(f=>positions[f]={});customCards=[];customConns=[];
   document.querySelectorAll('.card.custom').forEach(c=>c.remove());
-  scale=calcDefaultScale();panX=0;panY=0;applyT();applyLayout(currentFilter,false);
+  scale=calcDefaultScale();panX=0;panY=0;applyTransform();applyLayout(currentFilter,false);
   await saveState();
   showToast('Board fully reset for all viewers');
 });
@@ -1257,11 +1314,11 @@ function showPinchHint(){
 // INIT
 // ═══════════════════════════════════════════════════════════
 window.addEventListener('load', async ()=>{
-  scale=calcDefaultScale();applyT();
+  scale=calcDefaultScale();applyTransform();
   const hasSaved = await loadState();
   setProgress(70, 'Positioning cards...');
   document.querySelectorAll('.fbtn').forEach(b=>b.classList.toggle('active',b.dataset.f===currentFilter));
-  customCards.forEach(cc=>renderCustomCard(cc));
+  customCards.forEach(customCard => renderCustomCard(customCard));
   applyLayout(currentFilter,false);
   attachDragging();
   setProgress(90, 'Centring view...');
@@ -1276,7 +1333,7 @@ window.addEventListener('load', async ()=>{
     }, 400);
   }, 700);
 });
-window.addEventListener('resize',()=>{scale=calcDefaultScale();applyT();applyLayout(currentFilter,false);});
+window.addEventListener('resize',()=>{scale=calcDefaultScale();applyTransform();applyLayout(currentFilter,false);});
 </script>
 </body>
 </html>
