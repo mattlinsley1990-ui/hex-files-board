@@ -610,7 +610,7 @@ function saveState() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'X-Master-Key': JSONBIN_API_KEY,
+          'X-Access-Key': JSONBIN_API_KEY,
           'X-Bin-Versioning': 'false', // overwrite rather than version
         },
         body: JSON.stringify(payload),
@@ -623,11 +623,16 @@ async function loadState() {
   try {
     showToast('Loading board…');
     const res = await fetch(`${JSONBIN_URL}/latest`, {
-      headers: { 'X-Master-Key': JSONBIN_API_KEY },
+      headers: {
+        'X-Access-Key': JSONBIN_API_KEY,
+        'X-Bin-Meta': 'false',
+      },
     });
-    if (!res.ok) return false;
-    const json = await res.json();
-    const d = json.record;
+    if (!res.ok) {
+      console.warn('JSONBin load failed — status:', res.status);
+      return false;
+    }
+    const d = await res.json();
     if (!d) return false;
     if (d.positions) Object.keys(positions).forEach(f => { positions[f] = d.positions[f] || {}; });
     customCards   = d.customCards  || [];
