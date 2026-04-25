@@ -428,7 +428,7 @@ body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;wi
 </div>
 <div class="card entity" id="ent-tonybiggs" data-invs="fiendish" style="z-index:40;">
   <div class="ct">NPC</div><div class="cn">Tony Biggs</div>
-  <div class="cb">Union leader. Operations may be subject to fiendish manipulation. Associate at museum gala.</div>
+  <div class="cb">Union leader and Comptroller candidate. Fiendish manipulation suspected. Carid is his enforcer. City layout may be a fiendish endgame.</div>
   <div class="dots"><div class="dot" style="background:var(--fiendish)"></div></div>
 </div>
 <div class="card entity" id="ent-giuseppe" data-invs="feywild" style="z-index:40;">
@@ -443,7 +443,7 @@ body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;wi
 </div>
 <div class="card entity" id="ent-ellara" data-invs="feywild" style="z-index:40;">
   <div class="ct">NPC</div><div class="cn">Ellara Raleigh</div>
-  <div class="cb">Confirmed Fey entity on the material plane. Grad student under Montaigne. Wishes to return home.</div>
+  <div class="cb">Confirmed Fey entity. Arrived near Timberknoll via Giuseppe's soul-transfer rituals. Veil Division agents took her brothers. Feywild crossing imminent.</div>
   <div class="dots"><div class="dot" style="background:var(--feywild)"></div></div>
 </div>
 <div class="card entity missing" id="ent-motherofknots" data-invs="feywild" style="z-index:40;">
@@ -474,6 +474,13 @@ body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;wi
   <div class="ct">NPC</div><div class="cn">The Butler</div>
   <div class="cb">Head of the infernal cohort bound to the Astor Estate under Astor's contracts. Freed when the binding broke. Holds Veritas's card. Open to negotiation.</div>
   <div class="dots"><div class="dot" style="background:var(--fiendish)"></div></div>
+</div>
+
+<!-- CITY -->
+<div class="card entity" id="ent-bellefleur" data-invs="fiendish feywild" style="z-index:40;">
+  <div class="ct">Location</div><div class="cn">Bellefleur</div>
+  <div class="cb">Jacob Astor's city layout may be a grand planar binding ritual. Freed devils took the infrastructure plans. Fiendish political control underway.</div>
+  <div class="dots"><div class="dot" style="background:var(--fiendish)"></div><div class="dot" style="background:var(--feywild)"></div></div>
 </div>
 
 </div></div>
@@ -626,11 +633,12 @@ const BUILTIN_CONNS = [
   ['inv-feywild','ent-timberknoll',   'var(--str-feywild)',3,  'Site of operation'],
   ['inv-feywild','ent-montaigne',     'var(--str-feywild)',3,  'Rift research'],
   ['inv-feywild','ent-ellara',        'var(--str-feywild)',3,  'Confirmed Fey entity'],
-  ['inv-feywild','ent-veildiv',       'var(--str-feywild)',2.5,'Monitoring — suspected',true],
+  ['inv-feywild','ent-veildiv',       'var(--str-cross)',2.5,'Agents took Ellara\'s brothers',true],
   ['ent-giuseppe','ent-motherofknots','var(--str-feywild)',2.5,'Decades of bargains'],
   ['ent-giuseppe','ent-timberknoll',  'var(--str-feywild)',2,  'Workshop here'],
   ['ent-montaigne','ent-ellara',      'var(--str-feywild)',2,  'Working to return her'],
   ['ent-artemesia','ent-ellara',      'var(--str-feywild)',2,  'Detected fey energy'],
+  ['ent-ellara',  'ent-timberknoll',  'var(--str-feywild)',2,  'Arrived near here'],
   ['inv-fiendish','ent-carid',        'var(--str-fiendish)',3.5,'Confirmed fiendish aura'],
   ['inv-fiendish','ent-tonybiggs',    'var(--str-fiendish)',3,  'Possible manipulation'],
   ['inv-fiendish','ent-qinglong',     'var(--str-fiendish)',3,  "Carid's former dojo"],
@@ -647,6 +655,8 @@ const BUILTIN_CONNS = [
   ['inv-fiendish', 'ent-thebutler',   'var(--str-fiendish)',2.5,'Head of bound cohort'],
   ['ent-astorestate','ent-thebutler', 'var(--str-fiendish)',2,'Served under contract'],
   ['ent-astorestate','ent-montaigne', 'var(--str-feywild)',2,'Books retrieved here'],
+  ['inv-fiendish', 'ent-bellefleur',  'var(--str-fiendish)',3,'City as binding ritual'],
+  ['ent-thebutler','ent-bellefleur',  'var(--str-fiendish)',2,'Took city plans'],
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -660,7 +670,7 @@ const GRID_LAYOUTS = {
     'ent-giuseppe':[0,5.5],'ent-motherofknots':[0,7.5],'ent-timberknoll':[2,9],
     'ent-montaigne':[3.5,9.5],'ent-ellara':[5,9.5],'ent-artemesia':[4,8],
     'ent-carid':[8.5,5.5],'ent-tonybiggs':[9,7.5],'ent-qinglong':[9,5.5],
-    'ent-astorestate':[3.5,5],'ent-thebutler':[8.5,8],
+    'ent-astorestate':[3.5,5],'ent-thebutler':[8.5,8],'ent-bellefleur':[6,8],
   },
   ubergeist:{
     'inv-ubergeist':[2,2],'ent-sammael':[0,1],'ent-tavierm':[0,3],
@@ -679,7 +689,7 @@ const GRID_LAYOUTS = {
   fiendish:{
     'inv-fiendish':[2,2],'ent-carid':[0,1],'ent-tonybiggs':[0,3],
     'ent-qinglong':[4,1],'ent-acmetink':[4,3],'ent-artemesia':[2,4.5],
-    'ent-astorestate':[2,0],'ent-thebutler':[4,5],
+    'ent-astorestate':[2,0],'ent-thebutler':[4,5],'ent-bellefleur':[0,5],
   },
 };
 
@@ -1177,6 +1187,7 @@ function getAllCardOptions(){
     {id:'ent-ellara',name:'Ellara Raleigh'},{id:'ent-motherofknots',name:'The Mother of Knots'},
     {id:'ent-timberknoll',name:'Timberknoll'},{id:'ent-isleofgalois',name:'Isle of Galois'},
     {id:'ent-astorestate',name:'The Astor Estate'},{id:'ent-thebutler',name:'The Butler'},
+    {id:'ent-bellefleur',name:'Bellefleur'},
     ...customCards.map(c=>({id:c.id,name:c.name})),
   ];
 }
