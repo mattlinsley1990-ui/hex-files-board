@@ -369,7 +369,7 @@ body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;wi
 </div>
 <div class="card inv" id="inv-feywild" data-invs="feywild" style="--inv-color:var(--feywild);z-index:50;">
   <div class="ct">Investigation</div><div class="cn">The Feywild</div>
-  <div class="cb">Centuries of Fey infiltration. Crossing completed — Veritas now in the Feywild. The Mother of Knots operates through bargains.</div>
+  <div class="cb">Centuries of Fey infiltration. Inter-planar rift sought. The Mother of Knots operates through bargains.</div>
 </div>
 <div class="card inv" id="inv-fiendish" data-invs="fiendish" style="--inv-color:var(--fiendish);z-index:50;">
   <div class="ct">Investigation</div><div class="cn">Fiendish Influences</div>
@@ -413,7 +413,7 @@ body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;wi
 <!-- NPCS -->
 <div class="card entity" id="ent-squidproquo" data-invs="ubergeist bioform feywild" style="z-index:40;">
   <div class="ct">NPC</div><div class="cn">Squid Pro Quo</div>
-  <div class="cb">Veil Division operative. Holds partial Ubergeist intel. Named his missing partner: Sarah. Gave Veritas a photo as ID. Declined to join the Feywild crossing.</div>
+  <div class="cb">Veil Division operative. Holds partial Ubergeist intel. Missing partner investigated BioForm — trail leads to the Feywild.</div>
   <div class="dots"><div class="dot" style="background:var(--ubergeist)"></div><div class="dot" style="background:var(--bioform)"></div><div class="dot" style="background:var(--feywild)"></div></div>
 </div>
 <div class="card entity missing" id="ent-tavierm" data-invs="ubergeist" style="z-index:40;">
@@ -438,22 +438,17 @@ body{background:#1a0f07;font-family:'Courier Prime',monospace;overflow:hidden;wi
 </div>
 <div class="card entity" id="ent-montaigne" data-invs="feywild" style="z-index:40;">
   <div class="ct">NPC</div><div class="cn">Frederick Montaigne</div>
-  <div class="cb">Professor researching inter-planar rifts. Completed the Signal Lantern and sent Veritas through. Remains in Bellefleur.</div>
+  <div class="cb">Professor researching inter-planar rifts. Books retrieved from Astor Estate. Feywild crossing completed. Remains in Bellefleur.</div>
   <div class="dots"><div class="dot" style="background:var(--feywild)"></div></div>
 </div>
 <div class="card entity" id="ent-ellara" data-invs="feywild" style="z-index:40;">
   <div class="ct">NPC</div><div class="cn">Ellara Raleigh</div>
-  <div class="cb">Confirmed Fey entity. Arrived near Timberknoll via Giuseppe's soul-transfer rituals. Veil Division agents took her brothers. Now in the Feywild with Veritas.</div>
+  <div class="cb">Confirmed Fey entity. Arrived near Timberknoll via Giuseppe's soul-transfer rituals. Veil Division agents took her brothers. Now travelling with Veritas through the Feywild.</div>
   <div class="dots"><div class="dot" style="background:var(--feywild)"></div></div>
 </div>
 <div class="card entity missing" id="ent-motherofknots" data-invs="feywild" style="z-index:40;">
   <div class="ct">NPC</div><div class="cn">The Mother of Knots</div>
   <div class="cb">Ancient Lumian deity. Exchanges children's souls for Fey passage to the material plane.</div>
-  <div class="dots"><div class="dot" style="background:var(--feywild)"></div></div>
-</div>
-<div class="card entity missing" id="ent-sarah" data-invs="feywild" style="z-index:40;">
-  <div class="ct">NPC</div><div class="cn">Sarah</div>
-  <div class="cb">SPQ's missing Veil Division partner. Investigated BioForm — trail leads into the Feywild via Timberknoll hollow. Name and photo provided by SPQ.</div>
   <div class="dots"><div class="dot" style="background:var(--feywild)"></div></div>
 </div>
 
@@ -662,8 +657,6 @@ const BUILTIN_CONNS = [
   ['ent-astorestate','ent-montaigne', 'var(--str-feywild)',2,'Books retrieved here'],
   ['inv-fiendish', 'ent-bellefleur',  'var(--str-fiendish)',3,'City as binding ritual'],
   ['ent-thebutler','ent-bellefleur',  'var(--str-fiendish)',2,'Took city plans'],
-  ['inv-feywild',  'ent-sarah',       'var(--str-feywild)',2.5,'Missing in the Feywild'],
-  ['ent-squidproquo','ent-sarah',     'var(--str-cross)',2,  'Missing partner',true],
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -678,7 +671,6 @@ const GRID_LAYOUTS = {
     'ent-montaigne':[3.5,9.5],'ent-ellara':[5,9.5],'ent-artemesia':[4,8],
     'ent-carid':[8.5,5.5],'ent-tonybiggs':[9,7.5],'ent-qinglong':[9,5.5],
     'ent-astorestate':[3.5,5],'ent-thebutler':[8.5,8],'ent-bellefleur':[6,8],
-    'ent-sarah':[7,9.5],
   },
   ubergeist:{
     'inv-ubergeist':[2,2],'ent-sammael':[0,1],'ent-tavierm':[0,3],
@@ -693,7 +685,6 @@ const GRID_LAYOUTS = {
     'ent-timberknoll':[1,4.5],'ent-montaigne':[5.5,0.5],'ent-ellara':[5.5,2.5],
     'ent-artemesia':[5,4.5],'ent-veildiv':[3,4.5],
     'ent-astorestate':[1.5,2],'ent-squidproquo':[7,1.5],
-    'ent-sarah':[7,3],
   },
   fiendish:{
     'inv-fiendish':[2,2],'ent-carid':[0,1],'ent-tonybiggs':[0,3],
@@ -1196,7 +1187,7 @@ function getAllCardOptions(){
     {id:'ent-ellara',name:'Ellara Raleigh'},{id:'ent-motherofknots',name:'The Mother of Knots'},
     {id:'ent-timberknoll',name:'Timberknoll'},{id:'ent-isleofgalois',name:'Isle of Galois'},
     {id:'ent-astorestate',name:'The Astor Estate'},{id:'ent-thebutler',name:'The Butler'},
-    {id:'ent-bellefleur',name:'Bellefleur'},{id:'ent-sarah',name:'Sarah'},
+    {id:'ent-bellefleur',name:'Bellefleur'},
     ...customCards.map(c=>({id:c.id,name:c.name})),
   ];
 }
